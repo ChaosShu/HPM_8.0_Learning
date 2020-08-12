@@ -1,0 +1,2 @@
+﻿app_bitstream_merge.obj : warning LNK4075: 忽略“/EDITANDCONTINUE”(由于“/INCREMENTAL:NO”规范)
+  bitstream_merge_vs2017.vcxproj -> D:\Chaos_Folder\HPM-8.0\build\x86_windows\x64\Debug\bitstream_merge.exe
