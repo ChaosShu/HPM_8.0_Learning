@@ -3658,9 +3658,10 @@ int encode_intra_dir(COM_BSW *bs, u8 ipm,
                     )
 {
     ENC_SBAC *sbac;
-    int ipm_code = (ipm == mpm[0]) ? -2 : ((mpm[1] == ipm) ? -1 : ((ipm < mpm[0]) ? ipm : ((ipm < mpm[1]) ? (ipm - 1) : (ipm - 2))));
+    //       ipm为mpm中第1个模式:-2，ipm为mpm中第2个模式:-1， ipm比mpm中第1个模式号小:ipm， ipm比mpm中第2个模式号小:ipm-1， 否则：ipm-2
+    int ipm_code = (ipm == mpm[0]) ? -2 : ((mpm[1] == ipm) ? -1 : ((ipm < mpm[0]) ? ipm : ((ipm < mpm[1]) ? (ipm - 1) : (ipm - 2))));//why
     sbac = GET_SBAC_ENC(bs);
-    if (ipm_code < 0)
+    if (ipm_code < 0)//ipm包含于mpm中或者...
     {
         enc_sbac_encode_bin(1, sbac, sbac->ctx.intra_dir, bs);
         enc_sbac_encode_bin(ipm_code + 2, sbac, sbac->ctx.intra_dir + 6, bs);

@@ -44,7 +44,7 @@ extern "C"
 /* AVS3 phase-2 macros*/
 //intra
 #define EIPM                               1 // M4993: extended intra prediction mode [cannot off now]
-#define MIPF                               1 // M5079: multiple intra prediction filter
+#define MIPF                               1 // M5079: multiple intra prediction filter（IRPF）
 #define PMC                                1 // M5158: Prediction from Multiple Cross-components
 #define IPF_CHROMA                         1 // M5385 M5418: enable intrapf for chroma components
 //inter
@@ -195,7 +195,7 @@ extern "C"
 #define DT_INTRA_FAST_BY_RD                1  // fast algorithm: early skip based on RD cost comparison
 #define DT_SAVE_LOAD                       1  // fast algorithm: save & load best part_size
 #endif
-#define PRINT_CU                           0
+#define PRINT_CU                           0      ///@UpdatedBy:Chaos ，打开了打印CU信息的开关（默认0）
 #define PRINT_CU_LEVEL_2                   0
 #define PRINT_HMVP_FIFO                    0
 #define PRINT_TRANSFORM_TABLE              0

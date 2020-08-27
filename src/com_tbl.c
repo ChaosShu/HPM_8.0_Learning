@@ -289,7 +289,7 @@ const s16 com_tbl_ipred_adi[96][4] =
     { 19, 51, 45, 13 },
     { 18, 50, 46, 14 },
     { 17, 49, 47, 15 },
-    { 16, 48, 48, 16 },
+    { 16, 48, 48, 16 },//IPM == 8， offset == 16
     { 15, 47, 49, 17 },
     { 14, 46, 50, 18 },
     { 13, 45, 51, 19 },
@@ -412,7 +412,8 @@ const s16 com_tbl_ipred_adi[32][4] =
 #endif
 
 #if EIPM
-const int com_tbl_ipred_dxdy[IPD_CNT][2] = /* {dx/dy, dy/dx} */
+/*  dxdy表，（AVS才有的)，这里的值都是分子的值，分母默认是1024，相当于把AVS3文档里的Dxy和Dyx的分母提升到1024，再把分母保存在此tabel中*/
+const int com_tbl_ipred_dxdy[IPD_CNT][2] = /* {dx/dy, dy/dx} */   //{Dxy的分子, Dyx的分子}
 {
     {0, 0},{0, 0},{0, 0},                                 //0~2
     {2816, 372},{2048, 512},{1408, 744},{1024, 1024},     //3~6

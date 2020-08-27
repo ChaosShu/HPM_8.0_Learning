@@ -320,8 +320,8 @@ typedef int BOOL;
 
 /* MIPF (START) */
 #if MIPF
-#define MIPF_TH_SIZE                       64
-#define MIPF_TH_SIZE_CHROMA                32
+#define MIPF_TH_SIZE                       64 /*多参考像素滤波的 块阈值大小（亮度）*/
+#define MIPF_TH_SIZE_CHROMA                32 /*多参考像素滤波的 块阈值大小（色度）*/
 #define MIPF_TH_DIST                       1
 #define MIPF_TH_DIST_CHROMA                2
 #endif
@@ -387,7 +387,7 @@ extern int fp_trace_counter;
 /* Maximum count (dimension) of motion */
 #define MV_D                               2
 
-#define N_REF                              2  /* left, up, right */
+#define N_REF                              2  /* left, up ，right*/
 
 #define NUM_NEIB                           1  //since SUCO is not implemented
 
@@ -1696,7 +1696,7 @@ typedef struct _COM_SH_EXT
 } COM_SH_EXT;
 
 #if TB_SPLIT_EXT
-typedef struct _COM_PART_INFO
+typedef struct _COM_PART_INFO/*子块信息结构体*/
 {
     u8 num_sub_part;
     int sub_x[MAX_NUM_PB]; //sub part x, y, w and h
@@ -1875,7 +1875,7 @@ typedef struct _COM_MODE
     int             cu_width_log2;
     /* log2 of cu_height */
     int             cu_height_log2;
-    /* position of CU */
+    /* position of CU 与scu_p有什么区别呢*/
     int            x_pos;
     int            y_pos;
     /* CU position in current frame in SCU unit */
@@ -1901,7 +1901,7 @@ typedef struct _COM_MODE
 
 
 #if TB_SPLIT_EXT
-    int  num_nz[MAX_NUM_TB][N_C];
+    int  num_nz[MAX_NUM_TB][N_C];//[最大TB数（DT，PBT）][通道数]啊啊
 #else
     int  num_nz[N_C];
 #endif
@@ -2006,7 +2006,7 @@ typedef struct _COM_MODE
     u8   ph_awp_refine_flag;
 #endif
 #if EST
-    u8   est_flag;
+    u8   est_flag;//预测标志
 #endif
 #if USE_SP
     u8   sp_flag;

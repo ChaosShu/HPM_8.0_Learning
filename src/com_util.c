@@ -276,12 +276,12 @@ void check_mvp_motion_availability(COM_INFO *info, COM_MODE* mod_info_curr, COM_
 
     
     int cu_width_in_scu = cu_width >> MIN_CU_LOG2;
-    neb_addr[0] = scup - 1;                                     // A
-    neb_addr[1] = scup - pic_width_in_scu;                      // B
-    neb_addr[2] = scup - pic_width_in_scu + cu_width_in_scu;    // C
-    valid_flag[0] = x_scu > 0 && MCU_GET_CODED_FLAG(map_scu[neb_addr[0]]) && !MCU_GET_INTRA_FLAG(map_scu[neb_addr[0]]) && REFI_IS_VALID(map_refi[neb_addr[0]][lidx]);
+    neb_addr[0] = scup - 1;                                     // A 正左
+    neb_addr[1] = scup - pic_width_in_scu;                      // B 正上
+    neb_addr[2] = scup - pic_width_in_scu + cu_width_in_scu;    // C 右上
+    valid_flag[0] = x_scu > 0 && MCU_GET_CODED_FLAG(map_scu[neb_addr[0]]) && !MCU_GET_INTRA_FLAG(map_scu[neb_addr[0]]) && REFI_IS_VALID(map_refi[neb_addr[0]][lidx]);//是否超界and是否已编解码and是否帧内and0
     valid_flag[1] = y_scu > 0 && MCU_GET_CODED_FLAG(map_scu[neb_addr[1]]) && !MCU_GET_INTRA_FLAG(map_scu[neb_addr[1]]) && REFI_IS_VALID(map_refi[neb_addr[1]][lidx]);
-    valid_flag[2] = y_scu > 0 && x_scu + cu_width_in_scu < pic_width_in_scu && MCU_GET_CODED_FLAG(map_scu[neb_addr[2]]) && !MCU_GET_INTRA_FLAG(map_scu[neb_addr[2]]) && REFI_IS_VALID(map_refi[neb_addr[2]][lidx]);
+    valid_flag[2] = y_scu > 0 && x_scu + cu_width_in_scu < pic_width_in_scu && MCU_GET_CODED_FLAG(map_scu[neb_addr[2]]) && !MCU_GET_INTRA_FLAG(map_scu[neb_addr[2]]) && REFI_IS_VALID(map_refi[neb_addr[2]][lidx]);//需额外检测右上是否超界
     if (!valid_flag[2])
     {
         neb_addr[2] = scup - pic_width_in_scu - 1;              // D
@@ -665,7 +665,7 @@ void com_get_mvp_default(COM_INFO *info, COM_MODE *mod_info_curr, COM_REFP(*refp
 
     check_mvp_motion_availability(info, mod_info_curr, pic_map, neb_addr, valid_flag, lidx);
     ptr_cur_ref = refp[cur_refi][lidx].ptr;
-    for (cnt = 0; cnt < NUM_AVS2_SPATIAL_MV; cnt++)
+    for (cnt = 0; cnt < NUM_AVS2_SPATIAL_MV; cnt++)//AVS3里，MVP的空间候选列表有三个？
     {
         if (valid_flag[cnt])
         {
@@ -2800,22 +2800,22 @@ void get_col_mv_from_list0_ext(COM_REFP refp[REFP_NUM], s32 ptr_curr, int scup_c
 u16 com_get_avail_intra(int x_scu, int y_scu, int pic_width_in_scu, int scup, u32 * map_scu)
 {
     u16 avail = 0;
-    if (x_scu > 0 && MCU_GET_CODED_FLAG(map_scu[scup - 1]))
+    if (x_scu > 0 && MCU_GET_CODED_FLAG(map_scu[scup - 1]))//左侧可用？
     {
         SET_AVAIL(avail, AVAIL_LE);
     }
     if (y_scu > 0)
     {
-        if (MCU_GET_CODED_FLAG(map_scu[scup - pic_width_in_scu]))
+        if (MCU_GET_CODED_FLAG(map_scu[scup - pic_width_in_scu]))//上方可用？
         {
             SET_AVAIL(avail, AVAIL_UP);
         }
-        if (x_scu > 0 && MCU_GET_CODED_FLAG(map_scu[scup - pic_width_in_scu - 1]))
+        if (x_scu > 0 && MCU_GET_CODED_FLAG(map_scu[scup - pic_width_in_scu - 1]))//上方的左边一个scu可用？
         {
             SET_AVAIL(avail, AVAIL_UP_LE);
         }
     }
-    return avail;
+    return avail;//返回的avail每一位（其实只有后三位有效）代表一个位置的scu是否可以
 }
 
 int com_picbuf_signature(COM_PIC *pic, u8 *signature)
@@ -5068,6 +5068,8 @@ int  com_split_is_BT(SPLIT_MODE mode)
 }
 
 #if DT_SYNTAX
+/**确定当前CU是否满足DT的条件
+*/
 int com_dt_allow(int cu_w, int cu_h, int pred_mode, int max_dt_size)
 {
     //only allow intra DT
@@ -5076,8 +5078,8 @@ int com_dt_allow(int cu_w, int cu_h, int pred_mode, int max_dt_size)
 
     int max_size = max_dt_size;
     int min_size = 16;
-    int hori_allow = cu_h >= min_size && (cu_w <= max_size && cu_h <= max_size) && cu_w < cu_h * 4;
-    int vert_allow = cu_w >= min_size && (cu_w <= max_size && cu_h <= max_size) && cu_h < cu_w * 4;
+    int hori_allow = cu_h >= min_size && (cu_w <= max_size && cu_h <= max_size) && cu_w < cu_h * 4;//水平DT允许:宽高比小于4，CU不超过最大DTSize，高大于最小DTSize
+    int vert_allow = cu_w >= min_size && (cu_w <= max_size && cu_h <= max_size) && cu_h < cu_w * 4;//垂直DT允许:高宽比小于4，CU不超过最大DTSize，宽大于最小DTSize
 
     return hori_allow + (vert_allow << 1);
 }
@@ -5106,13 +5108,14 @@ void set_tb_part(COM_MODE *mod_info_curr, int part_size)
     mod_info_curr->tb_part = part_size;
 }
 
+/**/
 void get_part_info(int pic_width_in_scu, int x, int y, int w, int h, int part_size, COM_PART_INFO* sub_info)
 {
     int i;
-    int qw = w >> 2;
-    int qh = h >> 2;
+    int qw = w >> 2;//转化成scu计数
+    int qh = h >> 2;//转化成scu计数
     int x_scu, y_scu;
-    memset(sub_info, 0, sizeof(COM_PART_INFO));
+    memset(sub_info, 0, sizeof(COM_PART_INFO));//初始化子块信息
 
     //derive sub_part x, y, w, h
     switch (part_size)
@@ -5198,7 +5201,7 @@ void get_part_info(int pic_width_in_scu, int x, int y, int w, int h, int part_si
         assert(0);
     }
 
-    //derive sub_part scup
+    //derive sub_part scup（scu_position）
     for (i = 0; i < sub_info->num_sub_part; i++)
     {
         x_scu = PEL2SCU(sub_info->sub_x[i]);
@@ -5362,7 +5365,7 @@ int get_part_num_tb_in_pb(PART_SIZE pb_part_size, int pb_part_idx)
         return -1;
     }
 }
-
+/*有点不太懂*/
 int get_tb_idx_offset(PART_SIZE pb_part_size, int pb_part_idx)
 {
     switch (pb_part_size)
@@ -5390,6 +5393,7 @@ int get_tb_idx_offset(PART_SIZE pb_part_size, int pb_part_idx)
 
 
 //note: this function only works for DT intra
+/**根据PU调整TU的尺寸*/
 void get_tb_width_height_in_pb(int pb_w, int pb_h, PART_SIZE pb_part_size, int pb_part_idx, int *tb_w, int *tb_h)
 {
     switch (pb_part_size)
@@ -5448,7 +5452,7 @@ void get_tb_pos_in_pb(int pb_x, int pb_y, PART_SIZE pb_part_size, int tb_w, int 
         break;
     }
 }
-
+/* DT下，TB 的划分是每1/4_条_ 当作一个part划分的*/
 PART_SIZE get_tb_part_size_by_pb(PART_SIZE pb_part, int pred_mode)
 {
     PART_SIZE tb_part = 0;
@@ -5685,6 +5689,7 @@ int is_cu_nz_equ(int dst[MAX_NUM_TB][N_C], int src[MAX_NUM_TB][N_C])
     return equ;
 }
 
+/*清楚内存内容（设0）*/
 void cu_nz_cln(int dst[MAX_NUM_TB][N_C])
 {
     memset(dst, 0, sizeof(int) * MAX_NUM_TB * N_C);

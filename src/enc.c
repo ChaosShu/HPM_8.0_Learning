@@ -607,7 +607,7 @@ static void select_assign_rpl_for_sh(ENC_CTX *ctx, COM_PIC_HEADER *pic_header)
             //int pocIdx = (pic_header->poc % ctx->param.i_period == 0) ? ctx->param.i_period : pic_header->poc % ctx->param.i_period;
             /*
                 采用参考软件原来的代码的话，GOPSize是以max_b_frames+1作为一个GOPSize的，如果不修改的话，除了第一个大GOP外（这里提到的GOP与GOPSize不是
-                对应的关系）其他重复的GOP的每一个Mini-GOP都只会采用第一个Mini-GOP内的配置。
+                对应的关系，GOP指配置文件中定义的 可循环重复的结构，Mini-GOP指 帧数=GOP-Size的结构）其他重复的GOP的每一个Mini-GOP都只会采用第一个Mini-GOP内的配置。
             */
             int pocIdx = (pic_header->poc % ctx->param.i_period == 0) ? ctx->param.i_period : (pic_header->poc % ctx->param.rpls_l0_cfg_num);///@UpdatedBy:Chaos 
             if (pic_header->poc % ctx->param.rpls_l0_cfg_num == 0) pocIdx = pic_header->poc % (ctx->param.rpls_l0_cfg_num + 1);//修复一个额外的错误POC=k*rpls_l0_cfg_num时，又变成了first-miniGOP

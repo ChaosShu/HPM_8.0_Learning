@@ -64,7 +64,7 @@ extern "C"
 #define COM_CLIP3(min_x, max_x, value)   COM_MAX((min_x), COM_MIN((max_x), (value)))
 
 /*! macro to clipping within min and max */
-#define COM_CLIP(n,min,max)            (((n)>(max))? (max) : (((n)<(min))? (min) : (n)))
+#define COM_CLIP(n,min,max)            (((n)>(max))? (max) : (((n)<(min))? (min) : (n)))//1>3则 取3，否则取中位数？
 
 #define COM_SIGN(x)                    (((x) < 0) ? -1 : 1)
 
@@ -352,7 +352,7 @@ int  is_cu_plane_nz(int nz[MAX_NUM_TB][N_C], int plane);
 void cu_plane_nz_cpy(int dst[MAX_NUM_TB][N_C], int src[MAX_NUM_TB][N_C], int plane);
 void cu_plane_nz_cln(int dst[MAX_NUM_TB][N_C], int plane);
 int is_cu_nz_equ(int dst[MAX_NUM_TB][N_C], int src[MAX_NUM_TB][N_C]);
-void cu_nz_cln(int dst[MAX_NUM_TB][N_C]);
+void cu_nz_cln(int dst[MAX_NUM_TB][N_C]);//清除目标内存
 void check_set_tb_part(COM_MODE *mode);
 void check_tb_part(COM_MODE *mode);
 void copy_rec_y_to_pic(pel* src, int x, int y, int w, int h, int stride, COM_PIC *pic);
