@@ -4657,7 +4657,7 @@ static void analyze_uni_pred(ENC_CTX *ctx, ENC_CORE *core, double *cost_L0L1, s1
 #if USE_SP
     mod_info_curr->sp_flag = 0;
 #endif
-    for (lidx = 0; lidx <= ((pi->slice_type == SLICE_P) ? PRED_L0 : PRED_L1); lidx++) // uni-prediction (L0 or L1) (once for P, twice for B)
+    for (lidx = 0; lidx <= ((pi->slice_type == SLICE_P) ? PRED_L0 : PRED_L1); lidx++) // uni-prediction (L0 or L1) (once for P, twice for B)P帧只循环一次。B帧则需循环两次
     {
         init_inter_data(pi, core);
         mv = mod_info_curr->mv[lidx];
@@ -4668,10 +4668,11 @@ static void analyze_uni_pred(ENC_CTX *ctx, ENC_CORE *core, double *cost_L0L1, s1
         {
             mvp = pi->mvp_scale[lidx][refi_cur];
 
-            com_derive_mvp(ctx->info, mod_info_curr, ctx->ptr, lidx, refi_cur, core->cnt_hmvp_cands,
+            com_derive_mvp(ctx->info, mod_info_curr, ctx->ptr, lidx, refi_cur, core->cnt_hmvp_cands,//一些预测方法，用于获取MVP？
                 core->motion_cands, ctx->map, ctx->refp, pi->curr_mvr, mvp);
 
-            // motion search
+            // motion search，fn_me是个函数指针，可以改变表其指向（全搜索或者快速搜索）
+            // fn_me == pinter_me_epzs (fn_me默认指向epzs的ME)
             mecost = pi->fn_me(pi, x, y, cu_width, cu_height, mod_info_curr->x_pos, mod_info_curr->y_pos, cu_width, &refi_cur, lidx, mvp, mv, 0);
             pi->mv_scale[lidx][refi_cur][MV_X] = mv[MV_X];
             pi->mv_scale[lidx][refi_cur][MV_Y] = mv[MV_Y];
@@ -7169,7 +7170,7 @@ int pinter_set_complexity(ENC_CTX *ctx, int complexity)
     pi->search_pattern_qpel = tbl_search_pattern_qpel_8point;
     pi->search_pattern_qpel_cnt = 8;
     pi->me_level = ME_LEV_QPEL;
-    pi->fn_me = pinter_me_epzs;
+    pi->fn_me = pinter_me_epzs;//函数指针，fn_me == pinter_me_epzs (fn_me默认指向epzs的ME)
     pi->fn_affine_me = pinter_affine_me_gradient;
     pi->complexity = complexity;
     return COM_OK;

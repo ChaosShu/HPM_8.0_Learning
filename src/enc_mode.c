@@ -66,7 +66,9 @@ static s32 entropy_bits[ENTROPY_BITS_TABLE_SIZE];
 //    sbac->bitcounter = 0;
 //}
 
-u32 enc_get_bit_number(ENC_SBAC *sbac)
+/**从熵编码结果获取比特数
+*/
+u32 enc_get_bit_number(ENC_SBAC *sbac)/*/获取比特数*/
 {
     return sbac->bitcounter + 8 * (sbac->stacked_ff) + 8 * (sbac->is_pending_byte ? 1 : 0) + 23 - sbac->left_bits;
 }
@@ -2721,17 +2723,17 @@ static double mode_coding_unit(ENC_CTX *ctx, ENC_CORE *core, int x, int y, int c
                 core->inter_satd = COM_UINT32_MAX;
             }
 
-            for (ipf_flag = 0; ipf_flag < ipf_passes_num; ++ipf_flag)
+            for (ipf_flag = 0; ipf_flag < ipf_passes_num; ++ipf_flag)//根据IPF_FLAG，执行被允许的IPF情况（若允许IPF，执行两次）
             {
 #if FIMC
                 // copy table for dt and ipf
-                if (ctx->info.sqh.fimc_enable_flag && ipf_flag > 0)
+                if (ctx->info.sqh.fimc_enable_flag && ipf_flag > 0)//默认会先执行不做ipf的情况，若开了ipf第二次执行时会进入if中
                 {
                     com_cntmpm_copy(&core->cntmpm_cands, &cntmpm_cands_last);
                 }
 #endif
                 core->mod_info_curr.ipf_flag = ipf_flag;
-                cost = analyze_intra_cu(ctx, core);
+                cost = analyze_intra_cu(ctx, core);//递归最底层的cost
 #if PRINT_CU
 #if FIXED_SPLIT
                 printf("\n[intra] ctu_idx_seq %5d x %4d y %4d w %3d h %3d tree %d cost %12.1f", ctx->ctu_idx_in_sequence, x, y, cu_width, cu_height, ctx->tree_status, cost == MAX_COST ? 9999999 : cost);

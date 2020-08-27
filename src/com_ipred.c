@@ -111,46 +111,49 @@ void pred_recon_intra_luma_pb(COM_PIC *pic, u32 *map_scu, s8* map_ipm, int pic_w
 void com_get_nbr(int x, int y, int width, int height, pel *src, int s_src, u16 avail_cu, pel nb[N_C][N_REF][MAX_CU_SIZE * 3], int scup, u32 * map_scu, int pic_width_in_scu, int pic_height_in_scu, int bit_depth, int ch_type)
 {
     int  i;
-    int  width_in_scu  = (ch_type == Y_C) ? (width >> MIN_CU_LOG2)  : (width >> (MIN_CU_LOG2 - 1));
+    int  width_in_scu  = (ch_type == Y_C) ? (width >> MIN_CU_LOG2)  : (width >> (MIN_CU_LOG2 - 1));//难道Chroma通道里的SCU是2*2的？目前来看是的
     int  height_in_scu = (ch_type == Y_C) ? (height >> MIN_CU_LOG2) : (height >> (MIN_CU_LOG2 - 1));
-    int  unit_size = (ch_type == Y_C) ? MIN_CU_SIZE : (MIN_CU_SIZE >> 1);
+    int  unit_size = (ch_type == Y_C) ? MIN_CU_SIZE : (MIN_CU_SIZE >> 1);//难道Chroma通道里的SCU是2*2的？目前来看是的
     int  x_scu = PEL2SCU(ch_type == Y_C ? x : x << 1);
     int  y_scu = PEL2SCU(ch_type == Y_C ? y : y << 1);
     pel *const src_bak = src;
-    pel *left = nb[ch_type][0] + 3;
-    pel *up   = nb[ch_type][1] + 3;
-    int pad_le = height;  //number of padding pixel in the left column
-    int pad_up = width;   //number of padding pixel in the upper row
+    pel *left = nb[ch_type][0] + 3;//每个neib存储区size肯定是够的（3*CTUwidth）但是头3个位置（空出来不放领域信息？）
+    pel *up   = nb[ch_type][1] + 3;//每个neib存储区size肯定是够的（3*CTUheight）但是头3个位置（空出来不放领域信息？）
+    int pad_le = height;  //number of padding pixel in the left column，左下方的参考像素
+    int pad_up = width;   //number of padding pixel in the upper row， 右上方的参考像素
     int pad_le_in_scu = height_in_scu;
     int pad_up_in_scu = width_in_scu;
 
-    com_mset_16b(left - 3, 1 << (bit_depth - 1), height + pad_le + 3);
-    com_mset_16b(up   - 3, 1 << (bit_depth - 1), width  + pad_up + 3);
+    com_mset_16b(left - 3, 1 << (bit_depth - 1), height + pad_le + 3);//初始化像素值
+    com_mset_16b(up   - 3, 1 << (bit_depth - 1), width  + pad_up + 3);//初始化像素值
+
+    /* ***                                        获取上方参考像素                                       *** */
     if(IS_AVAIL(avail_cu, AVAIL_UP))
-    {
-        com_mcpy(up, src - s_src, width * sizeof(pel));
-        for(i = 0; i < pad_up_in_scu; i++)
+    {//上方可用
+        com_mcpy(up, src - s_src, width * sizeof(pel));//将当前PU上方的原始像素(一行)复制到dst（up: nb[ch_type][1] + 3）中
+        for(i = 0; i < pad_up_in_scu; i++)//逐个check 右上方的scu
         {
             if(x_scu + width_in_scu + i < pic_width_in_scu && MCU_GET_CODED_FLAG(map_scu[scup - pic_width_in_scu + width_in_scu + i]))
-            {
-                com_mcpy(up + width + i * unit_size, src - s_src + width + i * unit_size, unit_size * sizeof(pel));
+            {//如果未超界且已被编码
+                com_mcpy(up + width + i * unit_size, src - s_src + width + i * unit_size, unit_size * sizeof(pel));//将当前正在check的scu对应的n（unit_size）个像素放入up的pad中
             }
             else
-            {
-                com_mset_16b(up + width + i * unit_size, up[width + i * unit_size - 1], unit_size);
+            {//超界或者未被编码
+                com_mset_16b(up + width + i * unit_size, up[width + i * unit_size - 1], unit_size);//复制前unit_size个像素的值
             }
         }
     }
 
+    /* ***                                        获取左侧参考像素                                       *** */
     if(IS_AVAIL(avail_cu, AVAIL_LE))
     {
-        src--;
-        for(i = 0; i < height; ++i)
+        src--;//移到 org_blk 左侧的列
+        for(i = 0; i < height; ++i)//将当前PU左侧的原始像素(一列)复制到dst（left: nb[ch_type][0] + 3）中
         {
             left[i] = *src;
             src += s_src;
         }
-        for(i = 0; i < pad_le_in_scu; i++)
+        for(i = 0; i < pad_le_in_scu; i++)//逐个check 左下方的scu
         {
             if(y_scu + height_in_scu + i < pic_height_in_scu && MCU_GET_CODED_FLAG(map_scu[scup - 1 + (height_in_scu + i) *pic_width_in_scu]))
             {
@@ -169,19 +172,21 @@ void com_get_nbr(int x, int y, int width, int height, pel *src, int s_src, u16 a
         }
     }
 
+
+    //获取左上方参考像素，更新到nb[ch_type][x]的[2]位置
     if (IS_AVAIL(avail_cu, AVAIL_UP_LE))
     {
-        up[-1] = left[-1] = src_bak[-s_src - 1];
+        up[-1] = left[-1] = src_bak[-s_src - 1];//左上方可用，取左上方像素
     }
     else if (IS_AVAIL(avail_cu, AVAIL_UP))
     {
-        up[-1] = left[-1] = up[0];
+        up[-1] = left[-1] = up[0];//只有上方可用，取up[0]
     }
     else if (IS_AVAIL(avail_cu, AVAIL_LE))
     {
-        up[-1] = left[-1] = left[0];
+        up[-1] = left[-1] = left[0];//只有左侧可用，取left[0]
     }
-
+    //奇怪的规则↓
     up[-2] = left[0];
     left[-2] = up[0];
     up[-3] = left[1];
@@ -228,13 +233,13 @@ void ipred_dc(pel *src_le, pel *src_up, pel *dst, int w, int h, int bit_depth, u
     {
         for (i = 0; i < h; i++)
         {
-            dc += src_le[i];
+            dc += src_le[i];//求和
         }
         if(IS_AVAIL(avail_cu, AVAIL_UP))
         {
             for (j = 0; j < w; j++)
             {
-                dc += src_up[j];
+                dc += src_up[j];//求和
             }
             dc = (dc + ((w + h) >> 1)) * (4096 / (w + h)) >> 12;
         }
@@ -811,11 +816,12 @@ void ipred_ang(pel *src_le, pel *src_up, pel *dst, int w, int h, int ipm
 )
 {
 #if MIPF
-    const s16(*tbl_filt_list[4])[4] = { com_tbl_ipred_adi + 32, com_tbl_ipred_adi + 64, tbl_mc_c_coeff_hp, com_tbl_ipred_adi};
+    /* *******  读入AVS3标准中的多滤波器table  ********* */
+    const s16(*tbl_filt_list[4])[4] = { com_tbl_ipred_adi + 32, com_tbl_ipred_adi + 64, tbl_mc_c_coeff_hp, com_tbl_ipred_adi};//对应标准里的滤波器1，2，3，0
     const int filter_bits_list[4] = { 7, 7, 6, 7 };
     const int filter_offset_list[4] = { 64, 64 ,32, 64 };
-    const int is_small = w * h <= (is_luma ? MIPF_TH_SIZE : MIPF_TH_SIZE_CHROMA);
-    const int td = is_luma ? MIPF_TH_DIST : MIPF_TH_DIST_CHROMA;
+    const int is_small = w * h <= (is_luma ? MIPF_TH_SIZE : MIPF_TH_SIZE_CHROMA);//小于阈值块大小？据此选择 滤波器组号（共两组）
+    const int td = is_luma ? MIPF_TH_DIST : MIPF_TH_DIST_CHROMA;//行/列阈值（选滤波器时用）
     int filter_idx;
 #else
     const s16(*tbl_filt)[4] = com_tbl_ipred_adi;
@@ -834,7 +840,7 @@ void ipred_ang(pel *src_le, pel *src_up, pel *dst, int w, int h, int ipm
     int pos_max = w + h - 1;
     int p, pn, pn_n1, pn_p2;
 #if EIPM
-    if ((ipm < IPD_VER) || (ipm >= IPD_DIA_L_EXT && ipm <= IPD_VER_EXT))
+    if ((ipm < IPD_VER) || (ipm >= IPD_DIA_L_EXT && ipm <= IPD_VER_EXT))//第三象限↙模式，只参考上边像素（与HEVC,VVC的“左下”不同，AVS的角度并非[-135,45]）
 #else
     if (ipm < IPD_VER)
 #endif
@@ -842,21 +848,21 @@ void ipred_ang(pel *src_le, pel *src_up, pel *dst, int w, int h, int ipm
         src_ch = src_up;
         pos_max = w * 2 - 1;
 
-        for (j = 0; j < h; j++) 
+        for (j = 0; j < h; j++) //不同列的dx，offset不同
         {
             int dx;
-            GET_REF_POS(mt[0], j + 1, dx, offset);
+            GET_REF_POS(mt[0], j + 1, dx, offset);//计算dx（整像素）,offset（亚像素偏置）
 #if MIPF
-            filter_idx = mipf_enable_flag ? (j < td ? is_small + 1 : is_small) : 3;
-            filter = (tbl_filt_list[filter_idx] + offset)[0];
+            filter_idx = mipf_enable_flag ? (j < td ? is_small + 1 : is_small) : 3;//确定候选滤波器，小于td选第一个，否则选第二组
+            filter = (tbl_filt_list[filter_idx] + offset)[0];//filter指向对应offset的滤波器系数
 #else
             filter = (tbl_filt + offset)[0];
 #endif
-            for (i = 0; i < w; i++) 
+            for (i = 0; i < w; i++)//同一行的dx和offset相同
             {
                 int x = i + dx;
                 pn_n1 = x - 1;
-                p = x;
+                p = x;//“中心”像素（权重大的像素）
                 pn = x + 1;
                 pn_p2 = x + 2;
 
@@ -874,11 +880,11 @@ void ipred_ang(pel *src_le, pel *src_up, pel *dst, int w, int h, int ipm
                     filter_offset) >> filter_bits);
 #endif
             }
-            dst += w;
+            dst += w;//dst指向下一行
         }
     } 
 #if EIPM
-    else if ((ipm > IPD_HOR && ipm < IPD_IPCM) || (ipm >= IPD_HOR_EXT && ipm < IPD_CNT))
+    else if ((ipm > IPD_HOR && ipm < IPD_IPCM) || (ipm >= IPD_HOR_EXT && ipm < IPD_CNT))//第一象限↗模式，只参考左边像素
 #else
     else if (ipm > IPD_HOR)
 #endif
@@ -886,7 +892,7 @@ void ipred_ang(pel *src_le, pel *src_up, pel *dst, int w, int h, int ipm
         src_ch = src_le;
         pos_max = h * 2 - 1;
 
-        for (i = 0; i < w; i++) 
+        for (i = 0; i < w; i++) //同一列的dy和offset相同，不同行的offset不同
         {
             GET_REF_POS(mt[1], i + 1, t_dy[i], offset_y[i]);
         }
@@ -896,11 +902,12 @@ void ipred_ang(pel *src_le, pel *src_up, pel *dst, int w, int h, int ipm
             for (i = 0; i < w; i++) 
             {
                 int y = j + t_dy[i];
+                /*往“外”偏的参考像素确定方法*/
                 pn_n1 = y - 1;
                 p = y;
                 pn = y + 1;
                 pn_p2 = y + 2;
-
+                /**************************/
 #if  MIPF
                 filter_idx = mipf_enable_flag ? (i < td ? is_small + 1 : is_small) : 3;
                 filter = (tbl_filt_list[filter_idx] + offset_y[i])[0];
@@ -925,7 +932,7 @@ void ipred_ang(pel *src_le, pel *src_up, pel *dst, int w, int h, int ipm
             dst += w;
         }
     } 
-    else 
+    else //同时参考上方和左侧的角度模式
     {
         for (i = 0; i < w; i++) 
         {
@@ -938,7 +945,7 @@ void ipred_ang(pel *src_le, pel *src_up, pel *dst, int w, int h, int ipm
             t_dx[j] = -t_dx[j];
         }
 #if MIPF
-        if (ipm < IPD_DIA_R || (ipm > IPD_VER_EXT && ipm <= IPD_DIA_R_EXT))
+        if (ipm < IPD_DIA_R || (ipm > IPD_VER_EXT && ipm <= IPD_DIA_R_EXT))//mode∈(↘,↓)，即参考上方像素的左边
         {
 #endif
         for (j = 0; j < h; j++) 
@@ -956,11 +963,12 @@ void ipred_ang(pel *src_le, pel *src_up, pel *dst, int w, int h, int ipm
                     src_ch = src_up;
                     offset = offset_x[j];
                     pos_max = w * 2 - 1;
-
+                    /*往“内”偏的参考像素确定方法*/
                     pn_n1 = x + 1;
                     p = x;
                     pn = x - 1;
                     pn_p2 = x - 2;
+                    /**************************/
                 } 
                 else 
                 {
@@ -998,7 +1006,7 @@ void ipred_ang(pel *src_le, pel *src_up, pel *dst, int w, int h, int ipm
         }
 #if MIPF
         }
-        else
+        else//mode∈(→,↘)，即参考左侧像素的上边
         {
             for (j = 0; j < h; j++)
             {
@@ -1163,7 +1171,7 @@ void com_ipred(pel *src_le, pel *src_up, pel *dst, int ipm, int w, int h, int bi
 #if MIPF
     , int mipf_enable_flag
 #endif
-)
+)/*最底层的帧内预测*/
 {
     assert(w <= 64 && h <= 64);
 
@@ -1196,7 +1204,7 @@ void com_ipred(pel *src_le, pel *src_up, pel *dst, int ipm, int w, int h, int bi
     if( ipf_flag )
     {
         assert((w < MAX_CU_SIZE) && (h < MAX_CU_SIZE));
-        ipf_core(src_le, src_up, dst, ipm, w, h);
+        ipf_core(src_le, src_up, dst, ipm, w, h);//帧内预测滤波函数
     }
 
     // Clip predicted value
@@ -1206,7 +1214,7 @@ void com_ipred(pel *src_le, pel *src_up, pel *dst, int ipm, int w, int h, int bi
     if (ipf_flag || (ipm == IPD_BI) || (ipm == IPD_PLN))
 #endif
     {
-        clip_pred(dst, w, h, bit_depth);
+        clip_pred(dst, w, h, bit_depth);//把像素限制在 0~最大像素值
     }
 }
 
@@ -1384,23 +1392,23 @@ void pred_inter_filter(COM_PIC *pic, u32 *map_scu, s8* map_ipm, int pic_width_in
 
 #endif
 
-void com_get_mpm(int x_scu, int y_scu, u32 *map_scu, s8 *map_ipm, int scup, int pic_width_in_scu, u8 mpm[2])
+void com_get_mpm(int x_scu, int y_scu, u32 *map_scu, s8 *map_ipm, int scup, int pic_width_in_scu, u8 mpm[2])/*从领域获取ipm放入MPM列表*/
 {
-    u8 ipm_l = IPD_DC, ipm_u = IPD_DC;
+    u8 ipm_l = IPD_DC, ipm_u = IPD_DC;//初始化为DC模式
     int valid_l = 0, valid_u = 0;
 
     if(x_scu > 0 && MCU_GET_INTRA_FLAG(map_scu[scup - 1]) && MCU_GET_CODED_FLAG(map_scu[scup - 1]))
     {
-        ipm_l = map_ipm[scup - 1];
+        ipm_l = map_ipm[scup - 1];//左侧scu的ipm
         valid_l = 1;
     }
 
     if(y_scu > 0 && MCU_GET_INTRA_FLAG(map_scu[scup - pic_width_in_scu]) && MCU_GET_CODED_FLAG(map_scu[scup - pic_width_in_scu]))
     {
-        ipm_u = map_ipm[scup - pic_width_in_scu];
+        ipm_u = map_ipm[scup - pic_width_in_scu];//上方scu的ipm
         valid_u = 1;
     }
-    mpm[0] = COM_MIN(ipm_l, ipm_u);
+    mpm[0] = COM_MIN(ipm_l, ipm_u);//以索引号从小到大排列
     mpm[1] = COM_MAX(ipm_l, ipm_u);
     if(mpm[0] == mpm[1])
     {

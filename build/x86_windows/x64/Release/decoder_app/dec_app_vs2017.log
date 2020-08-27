@@ -1,7 +1,7 @@
 ﻿  app_decoder.c
   正在生成代码
-  2 of 503 functions ( 0.4%) were compiled, the rest were copied from previous compilation.
+  0 of 503 functions ( 0.0%) were compiled, the rest were copied from previous compilation.
     0 functions were new in current compilation
-    37 functions had inline decision re-evaluated but remain unchanged
+    0 functions had inline decision re-evaluated but remain unchanged
   已完成代码的生成
   dec_app_vs2017.vcxproj -> D:\Chaos_Folder\HPM-8.0\build\x86_windows\x64\Release\decoder_app.exe

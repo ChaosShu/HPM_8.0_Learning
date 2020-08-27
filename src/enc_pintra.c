@@ -125,18 +125,18 @@ static double pintra_residue_rdo(ENC_CTX *ctx, ENC_CORE *core, pel *org_luma, pe
         pel* pred_tb;
         cu_plane_nz_cln(mod_info_curr->num_nz, Y_C);
 
-        get_tb_width_height_in_pb(pb_w, pb_h, pb_part_size, pb_idx, &tb_w, &tb_h);
-        for (int tb_idx = 0; tb_idx < num_tb_in_pb; tb_idx++)
+        get_tb_width_height_in_pb(pb_w, pb_h, pb_part_size, pb_idx, &tb_w, &tb_h);//根据PU确定当前TU宽高
+        for (int tb_idx = 0; tb_idx < num_tb_in_pb; tb_idx++)//check每个TU
         {
             //derive tu basic info
-            get_tb_pos_in_pb(pb_x, pb_y, pb_part_size, tb_w, tb_h, tb_idx, &tb_x, &tb_y);
+            get_tb_pos_in_pb(pb_x, pb_y, pb_part_size, tb_w, tb_h, tb_idx, &tb_x, &tb_y);//根据PU确定TU起始位置
             coef_offset_tb = tb_idx * tb_w * tb_h;
             tb_x_scu = PEL2SCU(tb_x);
             tb_y_scu = PEL2SCU(tb_y);
             tb_scup = tb_x_scu + (tb_y_scu * ctx->info.pic_width_in_scu);
             //get start of tb residual
             pel* resi_tb = resi + coef_offset_tb; //residual is stored sequentially, not in raster, like coef
-            pel* rec_tb = pi->rec[Y_C] + (tb_y - mod_info_curr->y_pos) * cu_width + (tb_x - mod_info_curr->x_pos);
+            pel* rec_tb = pi->rec[Y_C] + (tb_y - mod_info_curr->y_pos) * cu_width + (tb_x - mod_info_curr->x_pos);//rec中tb的起始位置
 
             avail_tb = com_get_avail_intra(tb_x_scu, tb_y_scu, ctx->info.pic_width_in_scu, tb_scup, ctx->map.map_scu);
 
@@ -178,22 +178,22 @@ static double pintra_residue_rdo(ENC_CTX *ctx, ENC_CORE *core, pel *org_luma, pe
 
             //prediction according to the input ipm
             if (num_tb_in_pb == 1)
-                pred_tb = pi->pred_cache[intra_mode];
+                pred_tb = pi->pred_cache[intra_mode];//PU内只有一个TU时，直接等于
             else
-            {
-                mod = pi->addr_rec_pic[Y_C] + (tb_y * s_mod) + tb_x;
+            {//有DT时
+                mod = pi->addr_rec_pic[Y_C] + (tb_y * s_mod) + tb_x;//s_mod CTU级stride?
                 pred_tb = mod_info_curr->pred[Y_C]; // pred is temp memory
                 com_get_nbr(tb_x, tb_y, tb_w, tb_h, mod, s_mod, avail_tb, core->nb, tb_scup, ctx->map.map_scu, ctx->info.pic_width_in_scu, ctx->info.pic_height_in_scu, bit_depth, Y_C);
                 com_ipred(core->nb[0][0] + 3, core->nb[0][1] + 3, pred_tb, intra_mode, tb_w, tb_h, bit_depth, avail_tb, mod_info_curr->ipf_flag
 #if MIPF
                           , ctx->info.sqh.mipf_enable_flag
 #endif
-                );
+                );//最终  full_RDO    时的预测，预测数据写入pred_tb中
             }
 
             pel* org_luma_tb = org_luma + (tb_x - pb_x) + (tb_y - pb_y) * s_org;
             //trans & inverse trans
-            enc_diff_16b(tb_width_log2, tb_height_log2, org_luma_tb, pred_tb, s_org, tb_w, tb_w, coef_tmp[Y_C]);
+            enc_diff_16b(tb_width_log2, tb_height_log2, org_luma_tb, pred_tb, s_org, tb_w, tb_w, coef_tmp[Y_C]);//enc_sad.c  790行，调用了指令集优化
             mod_info_curr->num_nz[tb_idx][Y_C] = enc_tq_nnz(ctx, mod_info_curr, Y_C, 0, core->qp_y, ctx->lambda[0], coef_tmp[Y_C], coef_tmp[Y_C], tb_width_log2, tb_height_log2, pi->slice_type, Y_C, 1, secT_Ver_Hor, use_alt4x4Trans);
 #if IST
             if (ctx->info.sqh.ist_enable_flag && mod_info_curr->num_nz[tb_idx][Y_C] > 0)
@@ -295,7 +295,7 @@ static double pintra_residue_rdo(ENC_CTX *ctx, ENC_CORE *core, pel *org_luma, pe
             }
 
             //update map tb
-            update_intra_info_map_scu(ctx->map.map_scu, ctx->map.map_ipm, pb_x, pb_y, pb_w, pb_h, ctx->info.pic_width_in_scu, intra_mode);
+            update_intra_info_map_scu(ctx->map.map_scu, ctx->map.map_ipm, pb_x, pb_y, pb_w, pb_h, ctx->info.pic_width_in_scu, intra_mode);//更新map内信息
             copy_rec_y_to_pic(rec_tb, tb_x, tb_y, tb_w, tb_h, cu_width, PIC_REC(ctx));
         }
 
@@ -482,15 +482,15 @@ static u32 calc_satd_16b(int pu_w, int pu_h, void *src1, void *src2, int s_src1,
 }
 
 void com_update_cand_list(const u8 ipm, const double cost, const int ipd_num, int *ipred_list, double *cand_cost)
-{
+{/*     典型的排序算法，根据cost对ipred-list和cand-cost排序   */
     int shift = 0;
-    while (shift < ipd_num && cost < cand_cost[ipd_num - 1 - shift])
+    while (shift < ipd_num && cost < cand_cost[ipd_num - 1 - shift])//计算cand_cost前ipd_num个模式种 代价大于cost的模式数量（ipred_list和cand_list是按从小到大顺序排好的）
     {
         shift++;
     }
     if (shift != 0)
     {
-        for (int j = 1; j < shift; j++)
+        for (int j = 1; j < shift; j++)//把代价比cost大的 模式及其代价整体往后移动（把cost及其对应模式插入到这些模式的前面）
         {
             ipred_list[ipd_num - j] = ipred_list[ipd_num - 1 - j];
             cand_cost[ipd_num - j] = cand_cost[ipd_num - 1 - j];
@@ -500,6 +500,7 @@ void com_update_cand_list(const u8 ipm, const double cost, const int ipd_num, in
     }
 }
 
+/*check一种帧内模式，并存储其SATD代价相关信息*/
 void check_one_intra_pred_mode(ENC_CTX *ctx, ENC_CORE *core, pel *org, int s_org, u8 ipm, int ipred_list_len, int *ipred_list, double *cand_cost, int part_idx, int pb_w, int pb_h, u16 avail_cu)
 {
     ENC_PINTRA *pi = &ctx->pintra;
@@ -508,18 +509,20 @@ void check_one_intra_pred_mode(ENC_CTX *ctx, ENC_CORE *core, pel *org, int s_org
     int bit_depth = ctx->info.bit_depth_internal;
     int cu_width_log2 = (&core->mod_info_curr)->cu_width_log2;
     int cu_height_log2 = (&core->mod_info_curr)->cu_height_log2;
-    pel *pred_buf = pi->pred_cache[ipm];
+
+    /*获得当前mode下的预测图像*/
+    pel *pred_buf = pi->pred_cache[ipm];//预测图像缓冲区
     com_ipred(core->nb[0][0] + 3, core->nb[0][1] + 3, pred_buf, ipm, pb_w, pb_h, bit_depth, avail_cu, core->mod_info_curr.ipf_flag
 #if MIPF
               , ctx->info.sqh.mipf_enable_flag
 #endif
     );
-    cost = (double)calc_satd_16b(pb_w, pb_h, org, pred_buf, s_org, pb_w, bit_depth);
-    SBAC_LOAD(core->s_temp_run, core->s_curr_best[cu_width_log2 - 2][cu_height_log2 - 2]);
+    cost = (double)calc_satd_16b(pb_w, pb_h, org, pred_buf, s_org, pb_w, bit_depth);//计算SATD失真代价
+    SBAC_LOAD(core->s_temp_run, core->s_curr_best[cu_width_log2 - 2][cu_height_log2 - 2]);//LOAD熵编码（未编码当前角度模式）
     bit_cnt = enc_get_bit_number(&core->s_temp_run);
-    encode_intra_dir(&core->bs_temp, ipm, ctx->info.sqh.eipm_enable_flag, core->mod_info_curr.mpm[part_idx]);
-    bit_cnt = enc_get_bit_number(&core->s_temp_run) - bit_cnt;
-    cost += RATE_TO_COST_SQRT_LAMBDA(ctx->sqrt_lambda[0], bit_cnt);
+    encode_intra_dir(&core->bs_temp, ipm, ctx->info.sqh.eipm_enable_flag, core->mod_info_curr.mpm[part_idx]);//编码帧内角度模式
+    bit_cnt = enc_get_bit_number(&core->s_temp_run) - bit_cnt;//得到编码帧内角度模式所需比特数
+    cost += RATE_TO_COST_SQRT_LAMBDA(ctx->sqrt_lambda[0], bit_cnt);//得到总哈达玛代价
     com_update_cand_list(ipm, cost, ipred_list_len, ipred_list, cand_cost);
 }
 
@@ -528,19 +531,19 @@ static int make_ipred_list_fast(ENC_CTX *ctx, ENC_CORE *core, int width, int hei
     , u8 *mpm
 )
 {
-    static  const int AngMap[IPD_CNT] =
+    static  const int AngMap[IPD_CNT] =//帧内预测模式，按角度递增排列
     {
         0,1,2,3,34,4,35,5,36,6,37,7,
         38,8,39,9,40,10,41,11,42,43,
         12,44,45,13,46,14,47,15,48,
-        16,49,17,50,18,51,19,52,20,
-        53,21,54,22,55,23,56,57,24,
-        58,59,25,60,26,61,27,62,28,
+        16,49,17,50,18,51,19,52,20,// _39
+        53,21,54,22,55,23,56,57,24,// _48
+        58,59,25,60,26,61,27,62,28,// _57
         63,29,64,30,65,31,32,33
 
     };
 
-    static const int ReverseAng[IPD_CNT] =
+    static const int ReverseAng[IPD_CNT] =//把模式序号，映射到该模式在AVS3中按角度递增排列的序号
     {
         0,1,2,3,5,7,9,11,13,15,
         17,19,22,25,27,29,31,33,
@@ -551,8 +554,8 @@ static int make_ipred_list_fast(ENC_CTX *ctx, ENC_CORE *core, int width, int hei
         36,38,40,42,44,46,47,49,
         50,52,54,56,58,60,62
     };
-
-    static const u8 rmd_search_step_4[18] = { 0,  1,  2,  4,  6,  8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32 };
+    /****************************                递进的帧内预测模式快速粗选算法                 *************************/
+    static const u8 rmd_search_step_4[18] = { 0,  1,  2,  4,  6,  8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32 };//RMD搜索，特殊模式+4倍角
 
     ENC_PINTRA *pi = &ctx->pintra;
     int cu_width, cu_height, i;
@@ -566,16 +569,16 @@ static int make_ipred_list_fast(ENC_CTX *ctx, ENC_CORE *core, int width, int hei
     com_assert(ipd_rdo_cnt <= IPD_RDO_CNT);
     cu_width = 1 << cu_width_log2;
     cu_height = 1 << cu_height_log2;
-    for (i = 0; i < ipd_rdo_cnt; i++) 
+    for (i = 0; i < ipd_rdo_cnt; i++) //初始化ipred_list
     {
         ipred_list[i] = IPD_DC;
     }
 
-    int num_cand_step_4_in = 18;
-    int num_cand_step_4_out = 10;
+    int num_cand_step_4_in = 18;//第一步输入18种模式
+    int num_cand_step_4_out = 10;//第一步输出10种模式（第一步中最优）
     double rmd_cand_cost[18];
     int rmd_ipred_list[18];
-    for (i = 0; i < num_cand_step_4_in; i++) 
+    for (i = 0; i < num_cand_step_4_in; i++) //初始化粗选列表
     {
         rmd_ipred_list[i] = IPD_DC;
         rmd_cand_cost[i] = MAX_COST;
@@ -583,12 +586,12 @@ static int make_ipred_list_fast(ENC_CTX *ctx, ENC_CORE *core, int width, int hei
 
     u8 rmd_search_step_2[20] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };  // at most 2*num_cand_step_4_out
     int rmd_search_step_2_in = 0;
-    int rmd_search_step_2_out = 6;
+    int rmd_search_step_2_out = 6;//第二步输出6种模式（第二步中最优）
 
     u8 rmd_search_step_1[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };  // at most rmd_search_step_2_out * 2 + 4
     int rmd_search_step_1_in = 0;
 
-    for (i = 0; i < num_cand_step_4_in; i++) 
+    for (i = 0; i < num_cand_step_4_in; i++) //遍历第一步中的每种模式，并存储代价 相关信息，更新rmd_ipred_list及rmd_cand_cost
     {
 #if FIMC
         if (rmd_search_step_4[i] == mpm[0])
@@ -605,15 +608,15 @@ static int make_ipred_list_fast(ENC_CTX *ctx, ENC_CORE *core, int width, int hei
             continue;
         }
 
-        com_assert(rmd_search_step_4[i] != 33);
-        check_one_intra_pred_mode(ctx, core, org, s_org, rmd_search_step_4[i], COM_MAX(num_cand_step_4_out, ipd_rdo_cnt), rmd_ipred_list, rmd_cand_cost, part_idx, width, height, avail_cu);
+        com_assert(rmd_search_step_4[i] != 33);//模式33不存在rmd_ipred_list
+        check_one_intra_pred_mode(ctx, core, org, s_org, rmd_search_step_4[i], COM_MAX(num_cand_step_4_out, ipd_rdo_cnt), rmd_ipred_list, rmd_cand_cost, part_idx, width, height, avail_cu);//perform一遍帧内预测并更新rmd_ipred_list和rmd_cand_cost
     }
 
-    if (rmd_ipred_list[0] < 2 && rmd_ipred_list[1] < 2) 
+    if (rmd_ipred_list[0] < 2 && rmd_ipred_list[1] < 2) //粗模式表里的前两个不是DC和Plane
     {
         for (i = 0; i < 3; i++) 
         {
-            ipred_list[i] = rmd_ipred_list[i];
+            ipred_list[i] = rmd_ipred_list[i];//将第一步的模式列表代价最小的前三个读入 ipred_list 中
         }
 #if FIMC
         for( i = 0; i < NUM_MPM; i++ )
@@ -627,28 +630,29 @@ static int make_ipred_list_fast(ENC_CTX *ctx, ENC_CORE *core, int width, int hei
         return 3;
     }
 
-    for (int rmd_idx = 0; rmd_idx < num_cand_step_4_out; rmd_idx++) 
+    for (int rmd_idx = 0; rmd_idx < num_cand_step_4_out; rmd_idx++) //对于输出的10个最优4倍角，获取其相邻二倍角
     {
         int imode4step = ReverseAng[rmd_ipred_list[rmd_idx]];
-        int imode4step_sub_2 = AngMap[imode4step - 2];
-        int imode4step_add_2 = AngMap[imode4step + 2];
-        if (imode4step == 22 || imode4step == 48) 
+        int imode4step_sub_2 = AngMap[imode4step - 2];//左邻二倍角
+        int imode4step_add_2 = AngMap[imode4step + 2];//右邻二倍角
+        if (imode4step == 22 || imode4step == 48) //垂直模式或水平模式
         {
             imode4step_sub_2 = AngMap[imode4step - 3];
             imode4step_add_2 = AngMap[imode4step + 3];
         }       
-        if (imode4step >= 5 && (imode4step != 64)) 
+        if (imode4step >= 5 && (imode4step != 64)) //AngMap[imode2step] 对应Mode= 53 和 mode = 7(左边相邻的二倍角是四倍角)
         {
-            for (i = 0; i < rmd_search_step_2_in; i++) 
+            for (i = 0; i < rmd_search_step_2_in; i++) //check rmd_search_step_2的输入中是否含有模式imode4step_sub_2，（有则重复了，不放入rmd_search_step_2中）
             {
                 if (imode4step_sub_2 == rmd_search_step_2[i]) 
                 {
                   break;
                 }
             }
-            if (i == rmd_search_step_2_in && imode4step_sub_2 >= 3) 
+            //若有重复模式，break，即  i != rmd_search_step_2_in.
+            if (i == rmd_search_step_2_in && imode4step_sub_2 >= 3) //若无重复, i必 == rmd_search_step_2_in,  再确认左邻二倍角是角度模式
             {
-                rmd_search_step_2[rmd_search_step_2_in++] = imode4step_sub_2;
+                rmd_search_step_2[rmd_search_step_2_in++] = imode4step_sub_2;//添加‘左’邻二倍角
             }
             for (i = 0; i < rmd_search_step_2_in; i++) 
             {
@@ -657,14 +661,14 @@ static int make_ipred_list_fast(ENC_CTX *ctx, ENC_CORE *core, int width, int hei
                     break;
                 }
             }
-            if (i == rmd_search_step_2_in && imode4step_add_2 != 33) 
+            if (i == rmd_search_step_2_in && imode4step_add_2 != 33) //若无重复, 再确认右邻二倍角不是PCM模式（AngMap中模式33在AngMap[65]，因此只有add可能会出现IPM=33的情况，sub不会）
             {
-                rmd_search_step_2[rmd_search_step_2_in++] = imode4step_add_2;
+                rmd_search_step_2[rmd_search_step_2_in++] = imode4step_add_2;//添加‘右’邻二倍角
             }
         }
     }
 
-    for (int rmd_idx = 0; rmd_idx < rmd_search_step_2_in; rmd_idx++) 
+    for (int rmd_idx = 0; rmd_idx < rmd_search_step_2_in; rmd_idx++) //check 第二阶段所有输入，并选出SATD代价最低的6种角度（与4倍角也进行比较）
     {
         com_assert(rmd_search_step_2[rmd_idx] != 33);
 #if FIMC
@@ -680,33 +684,33 @@ static int make_ipred_list_fast(ENC_CTX *ctx, ENC_CORE *core, int width, int hei
         check_one_intra_pred_mode(ctx, core, org, s_org, rmd_search_step_2[rmd_idx], COM_MAX(rmd_search_step_2_out, ipd_rdo_cnt), rmd_ipred_list, rmd_cand_cost, part_idx, width, height, avail_cu);
     }
 
-    for (int rmd_idx = 0, j = 0; rmd_idx < rmd_search_step_2_out;)
+    for (int rmd_idx = 0, j = 0; rmd_idx < rmd_search_step_2_out;)//check第二阶段输出最优的6种模式，获取其 相邻单倍角
     {
         int imode2step = ReverseAng[rmd_ipred_list[j++]];
-        int imode2step_sub_1 = AngMap[imode2step - 1];
-        int imode2step_add_1 = AngMap[imode2step + 1];
+        int imode2step_sub_1 = AngMap[imode2step - 1];//左侧单倍角
+        int imode2step_add_1 = AngMap[imode2step + 1];//右侧单倍角
 
         if (j >= num_cand_step_4_in)
         {
             break;
         }
-        if (imode2step >= 4 && imode2step != 65)
+        if (imode2step >= 4 && imode2step != 65)//AngMap[imode2step]是单倍角且不是PCM模式
         {
             rmd_idx++;
-            if (rmd_search_step_1_in == 0)
+            if (rmd_search_step_1_in == 0)//单倍角列表为空（第一次写入模式）
             {
                 rmd_search_step_1[rmd_search_step_1_in++] = imode2step_sub_1;
-                if (imode2step_add_1 != 33 && imode2step != 63)
+                if (imode2step_add_1 != 33 && imode2step != 63)//mode ==33 PCM模式；mode==31已经没有‘右’邻单倍角模式了
                 {
-                    rmd_search_step_1[rmd_search_step_1_in++] = imode2step_add_1;
+                    rmd_search_step_1[rmd_search_step_1_in++] = imode2step_add_1;//添加‘右’邻单倍角
                 }
-                if (imode2step == 22 || imode2step == 48)
+                if (imode2step == 22 || imode2step == 48)//水平和垂直模式用42和45
                 {
                     rmd_search_step_1[rmd_search_step_1_in++] = AngMap[imode2step - 2];
                     rmd_search_step_1[rmd_search_step_1_in++] = AngMap[imode2step + 2];
                 }
             } 
-            else
+            else//同第二步
             {
                 for (i = 0; i < rmd_search_step_1_in; i++)
                 {
@@ -758,7 +762,7 @@ static int make_ipred_list_fast(ENC_CTX *ctx, ENC_CORE *core, int width, int hei
             }
         }
     }
-    for (int rmd_idx = 0; rmd_idx < rmd_search_step_1_in; rmd_idx++) 
+    for (int rmd_idx = 0; rmd_idx < rmd_search_step_1_in; rmd_idx++) //check第三阶段选处的单倍角模式, 并选出SATD代价最低的5或2(取最小值，FIMC时为2)种角度（与4倍角和2倍角也进行比较）
     {
 #if FIMC
         if (rmd_search_step_1[rmd_idx] == mpm[0])
@@ -785,14 +789,14 @@ static int make_ipred_list_fast(ENC_CTX *ctx, ENC_CORE *core, int width, int hei
     int pred_cnt = COM_MIN(ipd_rdo_cnt, IPD_RDO_CNT);
     for (i = 0; i < pred_cnt; i++) 
     {
-        ipred_list[i] = rmd_ipred_list[i];
+        ipred_list[i] = rmd_ipred_list[i];//更新帧内预测模式列表并返回
     }
 
-    for (i = pred_cnt - 1; i >= 0; i--)
+    for (i = pred_cnt - 1; i >= 0; i--)/*？？？？*/
     {
-        if (rmd_cand_cost[i] > core->inter_satd * (1.2))
+        if (rmd_cand_cost[i] > core->inter_satd * (1.2))//比帧间SATD大1.2倍
         {
-            pred_cnt--;
+            pred_cnt--;//减少帧内预测数目
         }
         else
         {
@@ -911,7 +915,7 @@ double analyze_intra_cu(ENC_CTX *ctx, ENC_CORE *core)
     int i, j, s_org, s_org_c, s_mod, s_mod_c;
     int best_ipd[MAX_NUM_TB] = { IPD_INVALID, IPD_INVALID, IPD_INVALID, IPD_INVALID };
     int best_ipd_pb_part[MAX_NUM_TB] = { IPD_INVALID, IPD_INVALID, IPD_INVALID, IPD_INVALID };
-    int best_ipd_c = IPD_INVALID;
+    int best_ipd_c = IPD_INVALID;//色度最优帧内预测模式
     s32 best_dist_y = 0, best_dist_c = 0;
     s32 best_dist_y_pb_part[MAX_NUM_TB] = { 0, 0, 0, 0 };
     u8  best_mpm_pb_part[MAX_NUM_TB][2];
@@ -968,28 +972,30 @@ double analyze_intra_cu(ENC_CTX *ctx, ENC_CORE *core)
 #if TB_SPLIT_EXT
     init_pb_part(&core->mod_info_curr);
     init_tb_part(&core->mod_info_curr);
+    //                                             x_scup*4 = x_Pelp         y_scup*4 = y_Pelp
     get_part_info(ctx->info.pic_width_in_scu, mod_info_curr->x_scu << 2, mod_info_curr->y_scu << 2, cu_width, cu_height, core->mod_info_curr.pb_part, &core->mod_info_curr.pb_info);
     get_part_info(ctx->info.pic_width_in_scu, mod_info_curr->x_scu << 2, mod_info_curr->y_scu << 2, cu_width, cu_height, core->mod_info_curr.tb_part, &core->mod_info_curr.tb_info);
 #endif
-    s_mod = pi->stride_rec[Y_C];
+    /*stride of reconstruction picture buffer*/
+    s_mod = pi->stride_rec[Y_C]; 
     s_org = pi->stride_org[Y_C];
     s_mod_c = pi->stride_rec[U_C];
     s_org_c = pi->stride_org[U_C];
     mod = pi->addr_rec_pic[Y_C] + (y * s_mod) + x;
     org = pi->addr_org[Y_C] + (y * s_org) + x;
     int part_size_idx, pb_part_idx;
-    core->best_pb_part_intra = SIZE_2Nx2N;
+    core->best_pb_part_intra = SIZE_2Nx2N;/*mark___________________________初始化帧内的PU最好的划分是2N*2N？*/
 
-    if (ctx->tree_status == TREE_LC || ctx->tree_status == TREE_L)
+    if (ctx->tree_status == TREE_LC || ctx->tree_status == TREE_L)//亮度Tree__DualTree结构？
     {
         int allowed_part_size[7] = { SIZE_2Nx2N };
         int num_allowed_part_size = 1;
         int dt_allow = ctx->info.sqh.dt_intra_enable_flag ? com_dt_allow(mod_info_curr->cu_width, mod_info_curr->cu_height, MODE_INTRA, ctx->info.sqh.max_dt_size) : 0;
 #if DT_INTRA_BOUNDARY_FILTER_OFF
-        if (core->mod_info_curr.ipf_flag)
+        if (core->mod_info_curr.ipf_flag)//使用IPF时禁止DT
             dt_allow = 0;
 #endif
-        //prepare allowed PU partition
+        //prepare allowed PU partition    方向已经通过com_dt_allow里的return 值确定了
         if (dt_allow & 0x1) // horizontal
         {
             allowed_part_size[num_allowed_part_size++] = SIZE_2NxhN;
@@ -1028,12 +1034,14 @@ double analyze_intra_cu(ENC_CTX *ctx, ENC_CORE *core)
 
         for (part_size_idx = 0; part_size_idx < num_allowed_part_size; part_size_idx++)
         {
+            //check所有可能的DT划分，选出能产生最小代价的DT划分及帧内模式；DT不被允许则PUSize=CUSize，即此for循环只执行一次
+            /********************************           关于TU，PU的相关设置        ***************************************/
             PART_SIZE pb_part_size = allowed_part_size[part_size_idx];
-            PART_SIZE tb_part_size = get_tb_part_size_by_pb(pb_part_size, MODE_INTRA);
+            PART_SIZE tb_part_size = get_tb_part_size_by_pb(pb_part_size, MODE_INTRA);//TBSize根据PB的划分，只存在三种情况：1.PU为2N*2N时，2N*2N（帧内）或N*N（帧间）、2.PU水平划分时，水平四个条带状 3.PU垂直划分时，垂直四个条带状
             set_pb_part(mod_info_curr, pb_part_size);
             set_tb_part(mod_info_curr, tb_part_size);
-            get_part_info(ctx->info.pic_width_in_scu, mod_info_curr->x_pos, mod_info_curr->y_pos, mod_info_curr->cu_width, mod_info_curr->cu_height, pb_part_size, &mod_info_curr->pb_info);
-            get_part_info(ctx->info.pic_width_in_scu, mod_info_curr->x_pos, mod_info_curr->y_pos, mod_info_curr->cu_width, mod_info_curr->cu_height, tb_part_size, &mod_info_curr->tb_info);
+            get_part_info(ctx->info.pic_width_in_scu, mod_info_curr->x_pos, mod_info_curr->y_pos, mod_info_curr->cu_width, mod_info_curr->cu_height, pb_part_size, &mod_info_curr->pb_info);//获取PB划分信息
+            get_part_info(ctx->info.pic_width_in_scu, mod_info_curr->x_pos, mod_info_curr->y_pos, mod_info_curr->cu_width, mod_info_curr->cu_height, tb_part_size, &mod_info_curr->tb_info);//获取TB划分信息
             assert(mod_info_curr->pb_info.sub_scup[0] == mod_info_curr->scup);
             cost_temp = 0;
             memset(num_nz_y_pb_part, 0, MAX_NUM_TB * sizeof(int));
@@ -1061,8 +1069,9 @@ double analyze_intra_cu(ENC_CTX *ctx, ENC_CORE *core)
 #endif
 
             // pb-based intra mode candidate selection
-            for (pb_part_idx = 0; pb_part_idx < mod_info_curr->pb_info.num_sub_part; pb_part_idx++)
+            for (pb_part_idx = 0; pb_part_idx < mod_info_curr->pb_info.num_sub_part; pb_part_idx++)//check每种DT下的每个PB，计算出其最低的代价
             {
+                /***************************获取每个sub块的信息************************/
                 int pb_x = mod_info_curr->pb_info.sub_x[pb_part_idx];
                 int pb_y = mod_info_curr->pb_info.sub_y[pb_part_idx];
                 int pb_w = mod_info_curr->pb_info.sub_w[pb_part_idx];
@@ -1071,8 +1080,8 @@ double analyze_intra_cu(ENC_CTX *ctx, ENC_CORE *core)
                 int pb_x_scu = PEL2SCU(pb_x);
                 int pb_y_scu = PEL2SCU(pb_y);
                 int pb_coef_offset = get_coef_offset_tb(mod_info_curr->x_pos, mod_info_curr->y_pos, pb_x, pb_y, cu_width, cu_height, tb_part_size);
-                int tb_idx_offset = get_tb_idx_offset(pb_part_size, pb_part_idx);
-                int num_tb_in_pb = get_part_num_tb_in_pb(pb_part_size, pb_part_idx);
+                int tb_idx_offset = get_tb_idx_offset(pb_part_size, pb_part_idx);//tb的索引补偿。非DT下正常操作，DT下，合并TB边界，并更新TB索引，若水平DT下，有4个TB，但若PB为2N*nU的话，下方的三个TB都被划作第二个TB（与PB对应）
+                int num_tb_in_pb = get_part_num_tb_in_pb(pb_part_size, pb_part_idx);//获取PB 内 TB的个数
                 int skip_ipd = 0;
                 if (((pb_part_size == SIZE_2NxnU || pb_part_size == SIZE_nLx2N) && pb_part_idx == 1) ||
                     ((pb_part_size == SIZE_2NxnD || pb_part_size == SIZE_nRx2N) && pb_part_idx == 0))
@@ -1083,11 +1092,11 @@ double analyze_intra_cu(ENC_CTX *ctx, ENC_CORE *core)
                 cost_pb_best = MAX_COST;
                 cu_nz_cln(mod_info_curr->num_nz);
 
-                mod = pi->addr_rec_pic[Y_C] + (pb_y * s_mod) + pb_x;
-                org = pi->addr_org[Y_C] + (pb_y * s_org) + pb_x;
+                mod = pi->addr_rec_pic[Y_C] + (pb_y * s_mod) + pb_x;//重构图像中，当前PU对应的起始位置
+                org = pi->addr_org[Y_C] + (pb_y * s_org) + pb_x;//原始图像中，当前PU对应的起始位置
 
                 u16 avail_cu = com_get_avail_intra(pb_x_scu, pb_y_scu, ctx->info.pic_width_in_scu, pb_scup, ctx->map.map_scu);
-                com_get_nbr(pb_x, pb_y, pb_w, pb_h, mod, s_mod, avail_cu, core->nb, pb_scup, ctx->map.map_scu, ctx->info.pic_width_in_scu, ctx->info.pic_height_in_scu, bit_depth, Y_C);
+                com_get_nbr(pb_x, pb_y, pb_w, pb_h, mod, s_mod, avail_cu, core->nb, pb_scup, ctx->map.map_scu, ctx->info.pic_width_in_scu, ctx->info.pic_height_in_scu, bit_depth, Y_C);///@UpdatedBy:Chaos ： 获取参考像素
 
 #if FIMC
                 if (ctx->info.sqh.fimc_enable_flag && ctx->info.pic_header.fimc_pic_flag)
@@ -1097,13 +1106,13 @@ double analyze_intra_cu(ENC_CTX *ctx, ENC_CORE *core)
                 else
                 {
 #endif
-                    com_get_mpm( pb_x_scu, pb_y_scu, ctx->map.map_scu, ctx->map.map_ipm, pb_scup, ctx->info.pic_width_in_scu, mod_info_curr->mpm[pb_part_idx] );
+                    com_get_mpm( pb_x_scu, pb_y_scu, ctx->map.map_scu, ctx->map.map_ipm, pb_scup, ctx->info.pic_width_in_scu, mod_info_curr->mpm[pb_part_idx] );//获取mpm模式，源于左侧和上方的scu的帧内角度模式
 #if FIMC
                 }
 #endif
 
 #if EIPM
-                if (ctx->info.sqh.eipm_enable_flag)
+                if (ctx->info.sqh.eipm_enable_flag)//扩展到帧内预测模式，从33种帧内预测模式到65种预测模式，但与VVC的角度似乎不一样     
                 {
                     pred_cnt = make_ipred_list_fast(ctx, core, pb_w, pb_h, cu_width_log2, cu_height_log2, org, s_org, ipred_list, pb_part_idx, avail_cu
                         , skip_ipd, mod_info_curr->mpm[pb_part_idx]
@@ -1187,13 +1196,14 @@ double analyze_intra_cu(ENC_CTX *ctx, ENC_CORE *core)
                     return MAX_COST;
                 }
 #if EST
-                int st_all = (ctx->info.sqh.est_enable_flag && mod_info_curr->tb_part == 0) ? 2 : 1;
+                int st_all = (ctx->info.sqh.est_enable_flag && mod_info_curr->tb_part == 0) ? 2 : 1;//先看1
                 for (int use_st = 0; use_st < st_all; use_st++)
                 {
                     mod_info_curr->est_flag = use_st;
                     if (ctx->info.sqh.est_enable_flag && mod_info_curr->tb_part != 0)
                         mod_info_curr->est_flag = 1;
 #endif
+                    /*比较一个PU内不同角度预测模式的full_RDO代价，并选出最优的模式，更新相关信息*/
                     for (j = 0; j < pred_cnt; j++) /* Y */
                     {
                         s32 dist_t = 0;
@@ -1244,13 +1254,13 @@ double analyze_intra_cu(ENC_CTX *ctx, ENC_CORE *core)
                                 int a = 0;
                             }
 #endif
-                            if (cost_pb_temp < cost_pb_best)
+                            if (cost_pb_temp < cost_pb_best)//比较当前角度模式下PB内 的代价，更新相关信息
                             {
                                 cost_pb_best = cost_pb_temp;
                                 best_dist_y_pb_part[pb_part_idx] = dist_t;
-                                best_ipd_pb_part[pb_part_idx] = i;
-                                best_mpm_pb_part[pb_part_idx][0] = mod_info_curr->mpm[pb_part_idx][0];
-                                best_mpm_pb_part[pb_part_idx][1] = mod_info_curr->mpm[pb_part_idx][1];
+                                best_ipd_pb_part[pb_part_idx] = i;//更新PB内更优ipm模式
+                                best_mpm_pb_part[pb_part_idx][0] = mod_info_curr->mpm[pb_part_idx][0];//更新PB内更优mpm模式
+                                best_mpm_pb_part[pb_part_idx][1] = mod_info_curr->mpm[pb_part_idx][1];//更新PB内更优mpm模式
 
 #if IST
                                 bst_ist_tu_flag = mod_info_curr->ist_tu_flag;
@@ -1293,15 +1303,15 @@ double analyze_intra_cu(ENC_CTX *ctx, ENC_CORE *core)
                     SBAC_STORE(core->s_temp_prev_comp_best, core->s_temp_prev_comp_run);
                 }
 #endif
-                cost_temp += cost_pb_best;
+                cost_temp += cost_pb_best;//将每个PB的best_cost相加，以获得当前CU划分下的总代价
                 if (pb_part_size == SIZE_2NxhN || pb_part_size == SIZE_hNx2N)
                 {
                     ipd_buf[pb_part_idx] = best_ipd_pb_part[pb_part_idx];
                 }
 
                 //update map - pb
-                update_intra_info_map_scu(ctx->map.map_scu, ctx->map.map_ipm, pb_x, pb_y, pb_w, pb_h, ctx->info.pic_width_in_scu, best_ipd_pb_part[pb_part_idx]);
-                copy_rec_y_to_pic(rec_y_pb_part + (pb_y - cu_y) * cu_width + (pb_x - cu_x), pb_x, pb_y, pb_w, pb_h, cu_width, PIC_REC(ctx));
+                update_intra_info_map_scu(ctx->map.map_scu, ctx->map.map_ipm, pb_x, pb_y, pb_w, pb_h, ctx->info.pic_width_in_scu, best_ipd_pb_part[pb_part_idx]);//更新pb附近的map信息
+                copy_rec_y_to_pic(rec_y_pb_part + (pb_y - cu_y) * cu_width + (pb_x - cu_x), pb_x, pb_y, pb_w, pb_h, cu_width, PIC_REC(ctx));// 把重构信息写入rec_pic中
 
 #if FIMC
                 if (ctx->info.sqh.fimc_enable_flag) //  && pb_part_idx == PB0
@@ -1311,7 +1321,7 @@ double analyze_intra_cu(ENC_CTX *ctx, ENC_CORE *core)
 #endif
             }
 
-            if (pb_part_size == SIZE_2NxhN || pb_part_size == SIZE_hNx2N)
+            if (pb_part_size == SIZE_2NxhN || pb_part_size == SIZE_hNx2N)//DT下4条带的划分
             {
                 int mem_offset = pb_part_size == SIZE_hNx2N ? 2 : 0;
                 if (ipd_buf[1] == IPD_PLN || ipd_buf[2] == IPD_PLN || ipd_buf[3] == IPD_PLN)
@@ -1343,14 +1353,15 @@ double analyze_intra_cu(ENC_CTX *ctx, ENC_CORE *core)
 
             com_mcpy(pi->rec[Y_C], rec_y_pb_part, cu_width * cu_height * sizeof(pel));
 #if RDO_DBK
-            if (mod_info_curr->pb_part != SIZE_2Nx2N)
+            if (mod_info_curr->pb_part != SIZE_2Nx2N)//如果CU进行了DT划分的话，需要进行去块滤波
             {
                 int cbf_y = num_nz_y_pb_part[0] + num_nz_y_pb_part[1] + num_nz_y_pb_part[2] + num_nz_y_pb_part[3];
                 calc_delta_dist_filter_boundary(ctx, core, PIC_REC(ctx), PIC_ORG(ctx), cu_width, cu_height, pi->rec, cu_width, x, y, 1, cbf_y, NULL, NULL, 0);
-                cost_temp += ctx->delta_dist;
+                cost_temp += ctx->delta_dist;//将去块滤波的失真，也计算进代价中
                 best_dist_y_pb_part[PB0] += (s32)ctx->delta_dist; //add delta SSD to the first PB
             }
 #endif
+            /*基于RD代价的帧内DT快速算法*/
 #if DT_INTRA_FAST_BY_RD
             if (pb_part_size == SIZE_2Nx2N)
                 cost_2Nx2N = cost_temp;
@@ -1377,7 +1388,7 @@ double analyze_intra_cu(ENC_CTX *ctx, ENC_CORE *core)
                     try_non_2NxhN = 0;
             }
 #endif
-            //save luma cb decision for each pb_part_size
+            //save luma cb decision for each pb_part_size，选出最优的PB划分模式（DT），并更新相关信息
             if (cost_temp < cost_best)
             {
                 cost_best = cost_temp;
@@ -1385,7 +1396,7 @@ double analyze_intra_cu(ENC_CTX *ctx, ENC_CORE *core)
                 for (int pb_idx = 0; pb_idx < mod_info_curr->pb_info.num_sub_part; pb_idx++)
                 {
                     best_dist_y += best_dist_y_pb_part[pb_idx];
-                    best_ipd[pb_idx] = best_ipd_pb_part[pb_idx];
+                    best_ipd[pb_idx] = best_ipd_pb_part[pb_idx];// 更新每个PB最优预测模式
                     best_mpm[pb_idx][0] = best_mpm_pb_part[pb_idx][0];
                     best_mpm[pb_idx][1] = best_mpm_pb_part[pb_idx][1];
                 }
@@ -1406,7 +1417,7 @@ double analyze_intra_cu(ENC_CTX *ctx, ENC_CORE *core)
                 core->best_pb_part_intra = mod_info_curr->pb_part;
                 core->best_tb_part_intra = mod_info_curr->tb_part;
 #endif
-                SBAC_STORE(core->s_temp_pb_part_best, core->s_temp_prev_comp_best);
+                SBAC_STORE(core->s_temp_pb_part_best, core->s_temp_prev_comp_best);//熵编码
 
 #if FIMC
                 // copy table for dt
@@ -1434,7 +1445,7 @@ double analyze_intra_cu(ENC_CTX *ctx, ENC_CORE *core)
         }
     }
 
-    if (ctx->tree_status == TREE_LC || ctx->tree_status == TREE_C)
+    if (ctx->tree_status == TREE_LC || ctx->tree_status == TREE_C)//色度Tree或者亮色共用树
     {
         //chroma RDO
         SBAC_STORE(core->s_temp_prev_comp_best, core->s_temp_pb_part_best);
@@ -1600,13 +1611,15 @@ double analyze_intra_cu(ENC_CTX *ctx, ENC_CORE *core)
         assert(0);
     //end of checks
 
-    for (pb_part_idx = 0; pb_part_idx < num_pb_best; pb_part_idx++)
+    /*******************************    更新当前CU最优划分信息及划分下相关参数信息    *******************************/
+
+    for (pb_part_idx = 0; pb_part_idx < num_pb_best; pb_part_idx++)//对于 bestCU 模式下每个PU
     {
-        core->mod_info_best.mpm[pb_part_idx][0] = best_mpm[pb_part_idx][0];
+        core->mod_info_best.mpm[pb_part_idx][0] = best_mpm[pb_part_idx][0];//更新mpm信息
         core->mod_info_best.mpm[pb_part_idx][1] = best_mpm[pb_part_idx][1];
-        core->mod_info_best.ipm[pb_part_idx][0] = (s8)best_ipd[pb_part_idx];
-        core->mod_info_best.ipm[pb_part_idx][1] = (s8)best_ipd_c;
-        mod_info_curr->ipm[pb_part_idx][0] = core->mod_info_best.ipm[pb_part_idx][0];
+        core->mod_info_best.ipm[pb_part_idx][0] = (s8)best_ipd[pb_part_idx];//更新最优IPM（亮度）
+        core->mod_info_best.ipm[pb_part_idx][1] = (s8)best_ipd_c;//更新最优IPM（色度）
+        mod_info_curr->ipm[pb_part_idx][0] = core->mod_info_best.ipm[pb_part_idx][0];/*置当前模式为 最优的模式*/
         mod_info_curr->ipm[pb_part_idx][1] = core->mod_info_best.ipm[pb_part_idx][1];
     }
     for (int tb_part_idx = 0; tb_part_idx < num_tb_best; tb_part_idx++)
