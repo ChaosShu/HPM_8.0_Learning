@@ -2746,7 +2746,7 @@ static double mode_coding_unit(ENC_CTX *ctx, ENC_CORE *core, int x, int y, int c
                     int a = 0;
                 }
 #endif
-                if (cost < cost_best)
+                if (cost < cost_best)//选出当前CU是否采用IPF 
                 {
                     cost_best = cost;
                     core->mod_info_best.cu_mode = MODE_INTRA;
