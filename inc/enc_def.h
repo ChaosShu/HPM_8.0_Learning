@@ -814,7 +814,7 @@ typedef struct _ENC_CORE
 #endif
 
 #if FIMC
-    COM_CNTMPM     cntmpm_cands;//66种模式的频率，及最高频率的两种模式MPM(频数表)
+    COM_CNTMPM     cntmpm_cands;
 #endif
 
 #if EXT_AMVR_HMVP

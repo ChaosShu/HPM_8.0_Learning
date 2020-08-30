@@ -853,7 +853,7 @@ void ipred_ang(pel *src_le, pel *src_up, pel *dst, int w, int h, int ipm
             int dx;
             GET_REF_POS(mt[0], j + 1, dx, offset);//计算dx（整像素）,offset（亚像素偏置）
 #if MIPF
-            filter_idx = mipf_enable_flag ? (j < td ? is_small + 1 : is_small) : 3;//确定候选滤波器，小于td选第一个，否则选第二个，不启用帧内多参考像素滤波时选默认滤波器
+            filter_idx = mipf_enable_flag ? (j < td ? is_small + 1 : is_small) : 3;//确定候选滤波器，小于td选第一个，否则选第二组
             filter = (tbl_filt_list[filter_idx] + offset)[0];//filter指向对应offset的滤波器系数
 #else
             filter = (tbl_filt + offset)[0];
@@ -1391,9 +1391,7 @@ void pred_inter_filter(COM_PIC *pic, u32 *map_scu, s8* map_ipm, int pic_width_in
 }
 
 #endif
-/**从邻域上方、左侧中获取mpm模式，按模式序号递增排列,若不可能则用DC模式填充
-*\param 11
-*/
+
 void com_get_mpm(int x_scu, int y_scu, u32 *map_scu, s8 *map_ipm, int scup, int pic_width_in_scu, u8 mpm[2])/*从领域获取ipm放入MPM列表*/
 {
     u8 ipm_l = IPD_DC, ipm_u = IPD_DC;//初始化为DC模式

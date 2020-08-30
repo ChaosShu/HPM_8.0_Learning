@@ -44,16 +44,7 @@ extern "C"
 /* AVS3 phase-2 macros*/
 //intra
 #define EIPM                               1 // M4993: extended intra prediction mode [cannot off now]
-#define MIPF                               1 // M5079: multiple intra prediction filter
-/*（IRPF,采纳的方案时Test 4,         对于亮度分量：
-                                    第一类滤波器：{ f3，f2 },对应索引2，1_______________(小于阈值块大小时使用)
-                                    第二类滤波器：{ f2，f1 },对应索引1，0_______________(大于阈值块大小时使用)
-                                    N = 1
-                                    对于色度分量：
-                                    第一类滤波器：{ f3，f2 }
-                                    第二类滤波器：{ f2，f1 }
-                                    N = 2
-                                    ）*/
+#define MIPF                               1 // M5079: multiple intra prediction filter（IRPF）
 #define PMC                                1 // M5158: Prediction from Multiple Cross-components
 #define IPF_CHROMA                         1 // M5385 M5418: enable intrapf for chroma components
 //inter

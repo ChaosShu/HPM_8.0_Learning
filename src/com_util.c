@@ -6227,7 +6227,6 @@ s32  divide_tbl(s32 dividend, s32 divisor)
 #endif
 
 #if FIMC
-/* 更新FIMC频数表 */
 void com_cntmpm_update(COM_CNTMPM* cntMpm, const s8 currMode)
 {
     cntMpm->freqT[currMode] += CNTMPM_BASE_VAL;
@@ -6238,7 +6237,7 @@ void com_cntmpm_update(COM_CNTMPM* cntMpm, const s8 currMode)
     u32 cost0 = cntMpm->freqT[mode0];
     u32 cost1 = cntMpm->freqT[mode1];
 
-    if (currCost >= cost0)//比较输入的模式 与目前频率最高的两种模式，更新modeT列表
+    if (currCost >= cost0)
     {
         cntMpm->modeT[0] = currMode;
         cntMpm->modeT[1] = mode0 != currMode ? mode0 : mode1;
