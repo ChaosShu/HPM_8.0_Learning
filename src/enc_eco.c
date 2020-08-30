@@ -3650,6 +3650,8 @@ int enc_eco_ibc(COM_BSW * bs, u8 pred_mode_ibc_flag, ENC_CTX *ctx)
     return COM_OK;
 }
 #endif
+/**纯_编码，写入二进制码流
+*/
 int encode_intra_dir(COM_BSW *bs, u8 ipm,
 #if EIPM
                      u8 eipm_flag,
