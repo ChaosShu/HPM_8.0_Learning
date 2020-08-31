@@ -1875,9 +1875,9 @@ typedef struct _COM_MODE
     int             cu_width_log2;
     /* log2 of cu_height */
     int             cu_height_log2;
-    /* position of CU 与scu_p有什么区别呢*/
-    int            x_pos;
-    int            y_pos;
+    /* position of CU ，与scu_p有什么区别呢*/
+    int            x_pos;//坐标
+    int            y_pos;//坐标
     /* CU position in current frame in SCU unit */
     int            scup;
 
@@ -1981,7 +1981,7 @@ typedef struct _COM_MODE
     /* intra prediction mode */
 #if TB_SPLIT_EXT
     u8   mpm[MAX_NUM_PB][2];
-    s8   ipm[MAX_NUM_PB][2];
+    s8   ipm[MAX_NUM_PB][2];//ipm[][0]:Luma , ipm[][1]:Chroma
 #else
     u8   mpm[2];
     s8   ipm[2];

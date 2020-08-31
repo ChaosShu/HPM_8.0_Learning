@@ -375,6 +375,7 @@ void ipred_bi(pel *src_le, pel *src_up, pel *dst, int w, int h)
 }
 
 #if PMC
+/* finalCr = predCr - reconCb */
 void subtractSample(int uiCWidth, int uiCHeight, int bitDept,
                           pel *pSrc0, int uiSrcStride0,
                           pel *pSrc1, int uiSrcStride1,
@@ -392,13 +393,14 @@ void subtractSample(int uiCWidth, int uiCHeight, int bitDept,
 #endif
 
 #if TSCPM
+/* 更新预测块，预测块大小等于色度块 */
 void downSampleCbCrPixels(int uiCWidth, int uiCHeight, int bitDept,
-                          pel *pSrc, int uiSrcStride,
-                          pel *pDst, int uiDstStride)
-{
+                          pel *pSrc, int uiSrcStride,/*max_cu_size：128*/
+                          pel *pDst, int uiDstStride/*max_cu_size：128*/)
+{//这里的Src是映射过后的块
     int maxResult = (1 << bitDept) - 1;
     int tempValue;
-
+    /* 下采样滤波器 */
     for (int j = 0; j < uiCHeight; j++)
     {
         for (int i = 0; i < uiCWidth; i++)
@@ -429,6 +431,7 @@ void downSampleCbCrPixels(int uiCWidth, int uiCHeight, int bitDept,
     }
 }
 
+/* 色度TSCPM中，获取Luma的边界区域像素（用于计算α,β）*/
 pel xGetLumaBorderPixel(int uiIdx, int bAbovePixel, int uiCWidth, int uiCHeight, int bAboveAvail, int bLeftAvail, pel nb[N_C][N_REF][MAX_CU_SIZE * 3])
 {
     pel *pSrc = NULL;
@@ -442,7 +445,7 @@ pel xGetLumaBorderPixel(int uiIdx, int bAbovePixel, int uiCWidth, int uiCHeight,
             int i = uiIdx;
             if (i < uiCWidth)
             {
-                if (i == 0 && !bLeftAvail)
+                if (i == 0 && !bLeftAvail)//之所以pSrc里的索引要*2，是因为wdhLuma = 2 * wdhChroma, hgtLuma = 2 * hgtChroma
                 {
                     dstPoint = (3 * pSrc[2 * i] + pSrc[2 * i + 1] + 2) >> 2;
                 }
@@ -472,10 +475,12 @@ pel xGetLumaBorderPixel(int uiIdx, int bAbovePixel, int uiCWidth, int uiCHeight,
     }
     return dstPoint;
 }
-
+/* 获取原始像素滤波后的像素值。对于上方像素，使用1/4加权；对于左侧像素，使用1/2加权 */
 #define xGetSrcPixel(idx, bAbovePixel)  xGetLumaBorderPixel((idx), (bAbovePixel), uiCWidth, uiCHeight, bAboveAvaillable, bLeftAvaillable, nb)
-#define xExchange(a, b, type) {type exTmp; exTmp = (a); (a) = (b); (b) = exTmp;}
+/*  */
+#define xExchange(a, b, type) {type exTmp; exTmp = (a); (a) = (b); (b) = exTmp;}/* 有种C++模板 的味儿了 */
 
+/* 通过分析当前分量与亮度分享像素值的关系，更新TSPCM的参数a,b,shift */
 void xSimpleGetTSCPMParameters(int compID, int *a, int *b, int *iShift, int bAbove, int bLeft, int uiCWidth, int uiCHeight, int bitDept, pel nb[N_C][N_REF][MAX_CU_SIZE * 3]
 #if ENHANCE_TSPCM || PMC
     , int ipm_c
@@ -495,10 +500,10 @@ void xSimpleGetTSCPMParameters(int compID, int *a, int *b, int *iShift, int bAbo
 
     int minDim = bLeftAvaillable && bAboveAvaillable ? min(uiCHeight, uiCWidth) : (bLeftAvaillable ? uiCHeight : uiCWidth);
     int numSteps = minDim;
-    int yMax = 0;
-    int xMax = -MAX_INT;
-    int yMin = 0;
-    int xMin = MAX_INT;
+    int yMax = 0;//Chroma
+    int xMax = -MAX_INT;//Luma
+    int yMin = 0;//Chroma
+    int xMin = MAX_INT;//Luma
 
     // four points start
     int iRefPointLuma[4] = { -1, -1, -1, -1 };
@@ -518,7 +523,7 @@ void xSimpleGetTSCPMParameters(int compID, int *a, int *b, int *iShift, int bAbo
     if (bAboveAvaillable)
     {
         pCur = pCurAbove;
-        int idx = ((numSteps - 1) * uiCWidth) / minDim;
+        int idx = ((numSteps - 1) * uiCWidth) / minDim;// 宽＞高：步长= 宽高比 * （高-1） ；高＞宽：步长= （宽-1） （基于色度）
         iRefPointLuma[0] = xGetSrcPixel(0, 1); // pSrc[0];
         iRefPointChroma[0] = pCur[0];
         iRefPointLuma[1] = xGetSrcPixel(idx, 1); // pSrc[idx];
@@ -537,7 +542,7 @@ void xSimpleGetTSCPMParameters(int compID, int *a, int *b, int *iShift, int bAbo
     if (bLeftAvaillable)
     {
         pCur = pCurLeft;
-        int idx = ((numSteps - 1) * uiCHeight) / minDim;
+        int idx = ((numSteps - 1) * uiCHeight) / minDim;// 高＞宽：步长= 高宽比 * （宽-1） ；高＜宽：步长= （高-1） （基于色度）
         iRefPointLuma[2] = xGetSrcPixel(0, 0); // pSrc[0];
         iRefPointChroma[2] = pCur[0];
         iRefPointLuma[3] = xGetSrcPixel(idx, 0); // pSrc[idx * iSrcStride];
@@ -608,32 +613,34 @@ void xSimpleGetTSCPMParameters(int compID, int *a, int *b, int *iShift, int bAbo
     if ((bAboveAvaillable &&  bLeftAvaillable)
             || (bAboveAvaillable && !bLeftAvaillable  && uiCWidth >= 4)
             || (bLeftAvaillable && !bAboveAvaillable && uiCHeight >= 4) )
-    {
+    {//同可用，一个可用一个不可用且可用的边其pel数大于等于四
         int minGrpIdx[2] = { 0, 2 };
         int maxGrpIdx[2] = { 1, 3 };
         int *tmpMinGrp = minGrpIdx;
         int *tmpMaxGrp = maxGrpIdx;
-        if (iRefPointLuma[tmpMinGrp[0]] > iRefPointLuma[tmpMinGrp[1]]) xExchange(tmpMinGrp[0], tmpMinGrp[1], int);
-        if (iRefPointLuma[tmpMaxGrp[0]] > iRefPointLuma[tmpMaxGrp[1]]) xExchange(tmpMaxGrp[0], tmpMaxGrp[1], int);
-        if (iRefPointLuma[tmpMinGrp[0]] > iRefPointLuma[tmpMaxGrp[1]]) xExchange(tmpMinGrp,    tmpMaxGrp,    int *);
-        if (iRefPointLuma[tmpMinGrp[1]] > iRefPointLuma[tmpMaxGrp[0]]) xExchange(tmpMinGrp[1], tmpMaxGrp[0], int);
+        /* 重排序，tmpMinGrp里存像素值更小的两个索引，tmpMaxGrp存像素值更大的两个索引，（内部也是从小到大排列）*/
+        if (iRefPointLuma[tmpMinGrp[0]] > iRefPointLuma[tmpMinGrp[1]]) xExchange(tmpMinGrp[0], tmpMinGrp[1], int);//0 2中小值放入minGroup[0]，大值放入maxGroup[1]
+        if (iRefPointLuma[tmpMaxGrp[0]] > iRefPointLuma[tmpMaxGrp[1]]) xExchange(tmpMaxGrp[0], tmpMaxGrp[1], int);//1 3中大值放入maxGroup[1],小值放入maxGroup[0]
+        if (iRefPointLuma[tmpMinGrp[0]] > iRefPointLuma[tmpMaxGrp[1]]) xExchange(tmpMinGrp,    tmpMaxGrp,    int *);//如果minGroup[0]比maxGroup[1]大，重新分配指针使得min指向小的group，max指向大的group
+        if (iRefPointLuma[tmpMinGrp[1]] > iRefPointLuma[tmpMaxGrp[0]]) xExchange(tmpMinGrp[1], tmpMaxGrp[0], int);//比较minGroup中的大值与maxGroup中小值，若min[1]>max[0]，交换
 
+        /* 确保用tmpMaxGrp和tmpMaxGrp索引获得的参考点像素值确实是从小到大 */
         assert(iRefPointLuma[tmpMaxGrp[0]] >= iRefPointLuma[tmpMinGrp[0]]);
         assert(iRefPointLuma[tmpMaxGrp[0]] >= iRefPointLuma[tmpMinGrp[1]]);
         assert(iRefPointLuma[tmpMaxGrp[1]] >= iRefPointLuma[tmpMinGrp[0]]);
         assert(iRefPointLuma[tmpMaxGrp[1]] >= iRefPointLuma[tmpMinGrp[1]]);
 
-        xMin = (iRefPointLuma  [tmpMinGrp[0]] + iRefPointLuma  [tmpMinGrp[1]] + 1 )>> 1;
-        yMin = (iRefPointChroma[tmpMinGrp[0]] + iRefPointChroma[tmpMinGrp[1]] + 1) >> 1;
+        xMin = (iRefPointLuma  [tmpMinGrp[0]] + iRefPointLuma  [tmpMinGrp[1]] + 1 )>> 1;//亮度min的均值
+        yMin = (iRefPointChroma[tmpMinGrp[0]] + iRefPointChroma[tmpMinGrp[1]] + 1) >> 1;//对应色度的均值
         
-        xMax = (iRefPointLuma  [tmpMaxGrp[0]] + iRefPointLuma  [tmpMaxGrp[1]] + 1 )>> 1;
-        yMax = (iRefPointChroma[tmpMaxGrp[0]] + iRefPointChroma[tmpMaxGrp[1]] + 1) >> 1;
+        xMax = (iRefPointLuma  [tmpMaxGrp[0]] + iRefPointLuma  [tmpMaxGrp[1]] + 1 )>> 1;//亮度max的均值
+        yMax = (iRefPointChroma[tmpMaxGrp[0]] + iRefPointChroma[tmpMaxGrp[1]] + 1) >> 1;//对应色度的均值
     }
     else if (bAboveAvaillable)
-    {
+    {//只有上可用但上边size＜4（模式IPD_TSCPM_C或IPD_MCPM_C里的情况）
         for (int k = 0; k < 2; k++)
         {
-            if (iRefPointLuma[k] > xMax)
+            if (iRefPointLuma[k] > xMax)//check可用的RefPointLuma，如果比xMax大则。。。。
             {
                 xMax = iRefPointLuma[k];
                 yMax = iRefPointChroma[k];
@@ -646,9 +653,9 @@ void xSimpleGetTSCPMParameters(int compID, int *a, int *b, int *iShift, int bAbo
         }
     }
     else if (bLeftAvaillable)
-    {
+    {//只有左可用但左侧size＜4（模式IPD_TSCPM_C或IPD_MCPM_C里的情况）
         for (int k = 2; k < 4; k++)
-        {
+        {//check可用的RefPointLuma，如果比xMax大则。。。。
             if (iRefPointLuma[k] > xMax)
             {
                 xMax = iRefPointLuma[k];
@@ -670,11 +677,11 @@ void xSimpleGetTSCPMParameters(int compID, int *a, int *b, int *iShift, int bAbo
         int diff = xMax - xMin;
         int add = 0;
         int shift = 0;
-        if (diff > 64)
+        if (diff > 64)//大于6bit，调整diff至4bit；否则不用调整
         {
             shift = (uiInternalBitDepth > 8) ? uiInternalBitDepth - 6 : 2;
             add = shift ? 1 << (shift - 1) : 0;
-            diff = (diff + add) >> shift;
+            diff = (diff + add) >> shift;//保留高4位
 
             if (uiInternalBitDepth == 10)
             {
@@ -682,11 +689,11 @@ void xSimpleGetTSCPMParameters(int compID, int *a, int *b, int *iShift, int bAbo
             }
         }
 
-        if (diff > 0)
+        if (diff > 0)//必满足
         {
-            *a = ((yMax - yMin) * g_aiTscpmDivTable64[diff - 1] + add) >> shift;
+            *a = ((yMax - yMin) * g_aiTscpmDivTable64[diff - 1] + add) >> shift;//当shift≠0时说明diff偏大（亮度差值大于64），由于此时对Δx右移了shift位，故此行代码将Δy也右移了shift位
         }
-        *b = yMin - (((s64)(*a) * xMin) >> (*iShift));
+        *b = yMin - (((s64)(*a) * xMin) >> (*iShift));// *a >> *iShift 才等同于 线性模型中的α
     }
     if (!bLeftAvaillable && !bAboveAvaillable)
     {
@@ -697,6 +704,7 @@ void xSimpleGetTSCPMParameters(int compID, int *a, int *b, int *iShift, int bAbo
     }
 }
 
+/* 计算出R'，放入Dst中 */
 void LinearTransformTSCPM(pel *pSrc, int iSrcStride, pel *pDst, int iDstStride, int a, int iShift, int b, int uiWidth, int uiHeight, int bitDept
 #if PMC && !PMC_CLIP_IPRED
     , u8 bClip
@@ -709,11 +717,11 @@ void LinearTransformTSCPM(pel *pSrc, int iSrcStride, pel *pDst, int iDstStride, 
     {
         for (int i = 0; i < uiWidth; i++)
         {
-            int tempValue = (((s64)a * pSrc[i]) >> (iShift >= 0 ? iShift : 0)) + b;
+            int tempValue = (((s64)a * pSrc[i]) >> (iShift >= 0 ? iShift : 0)) + b;//映射，R'=αR+β，α=a/iShift;
 #if PMC && !PMC_CLIP_IPRED
             pDst[i] = bClip ? COM_CLIP3(0, maxResult, tempValue) : tempValue;
 #else
-            pDst[i] = COM_CLIP3(0, maxResult, tempValue);
+            pDst[i] = COM_CLIP3(0, maxResult, tempValue);//clip
 #endif
         }
         pDst += iDstStride;
@@ -721,6 +729,7 @@ void LinearTransformTSCPM(pel *pSrc, int iSrcStride, pel *pDst, int iDstStride, 
     }
 }
 
+/* 更新通过TSCPM得到的色度预测块 */
 void ipred_tscpm(int compID, pel *piPred, pel *piRecoY, int uiStrideY,int uiWidth, int uiHeight, int bAbove, int bLeft, int bitDept, pel nb[N_C][N_REF][MAX_CU_SIZE * 3]
 #if ENHANCE_TSPCM || PMC
     , int ipm_c
@@ -768,17 +777,14 @@ void ipred_mcpm(int compID, pel *piPred, pel *piRecoY, int uiStrideY,int uiWidth
 
 
     int a, b, shift;
-    xSimpleGetTSCPMParameters(compID, &a, &b, &shift, bAbove, bLeft, uiWidth, uiHeight, bitDept, nb
-        , ipm_c
-    );
+    xSimpleGetTSCPMParameters(compID, &a, &b, &shift, bAbove, bLeft, uiWidth, uiHeight, bitDept, nb, ipm_c);//更新V分量的α，β
+
     int a_t, b_t, shift_t;
-    xSimpleGetTSCPMParameters(U_C, &a_t, &b_t, &shift_t, bAbove, bLeft, uiWidth, uiHeight, bitDept, nb
-        , ipm_c
-    );
+    xSimpleGetTSCPMParameters(U_C, &a_t, &b_t, &shift_t, bAbove, bLeft, uiWidth, uiHeight, bitDept, nb, ipm_c);//更新U分量的α，β
     assert(shift == shift_t);
 
-    a = a + a_t;
-    b = b + b_t;
+    a = a + a_t;//PMC里的a，α=a/shift
+    b = b + b_t;//PMC里的b，β=b
 
     pel *lumaRec = piRecoY;
     int lumaRecStride = uiStrideY;
@@ -1241,13 +1247,13 @@ void com_ipred_uv(pel *src_le, pel *src_up, pel *dst, int ipm_c, int ipm, int w,
     int bAbove = IS_AVAIL(avail_cu, AVAIL_UP);
     int bLeft = IS_AVAIL(avail_cu, AVAIL_LE);
 #endif
-    if(ipm_c == IPD_DM_C && COM_IPRED_CHK_CONV(ipm))
+    if(ipm_c == IPD_DM_C && COM_IPRED_CHK_CONV(ipm))//色度的DM模式是（Derived Mode？）
     {
-        ipm_c = COM_IPRED_CONV_L2C(ipm);
+        ipm_c = COM_IPRED_CONV_L2C(ipm);//如果亮度是特定的一些模式，直接转换成色度里的对应模式
     }
-    switch(ipm_c)
+    switch(ipm_c)//否则
     {
-    case IPD_DM_C:
+    case IPD_DM_C://其他情况下的衍生
         switch(ipm)
         {
         case IPD_PLN:
@@ -1280,7 +1286,7 @@ void com_ipred_uv(pel *src_le, pel *src_up, pel *dst, int ipm_c, int ipm, int w,
         break;
 #if TSCPM || PMC
     case IPD_TSCPM_C:
-        ipred_tscpm(chType, dst, piRecoY, uiStrideY, w,  h, bAbove, bLeft, bit_depth, nb
+        ipred_tscpm(chType, dst, piRecoY, uiStrideY, w, h, bAbove, bLeft, bit_depth, nb
 #if ENHANCE_TSPCM || PMC
             , ipm_c
 #endif
