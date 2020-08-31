@@ -1489,7 +1489,7 @@ double analyze_intra_cu(ENC_CTX *ctx, ENC_CORE *core)
         if (ctx->tree_status == TREE_C)
         {
             assert(cu_width >= 8 && cu_height >= 8);
-            int luma_scup = PEL2SCU(x + (cu_width - 1)) + PEL2SCU(y + (cu_height - 1)) * ctx->info.pic_width_in_scu;
+            int luma_scup = PEL2SCU(x + (cu_width - 1)) + PEL2SCU(y + (cu_height - 1)) * ctx->info.pic_width_in_scu;//CU右下角scu的位置
             best_ipd[PB0] = ctx->map.map_ipm[luma_scup];
 #if IPCM
             assert((best_ipd[PB0] >= 0 && best_ipd[PB0] < IPD_CNT) || best_ipd[PB0] == IPD_IPCM);
@@ -1503,14 +1503,14 @@ double analyze_intra_cu(ENC_CTX *ctx, ENC_CORE *core)
 #endif
         }
 #endif
-        ipm_l2c = best_ipd[PB0];
+        ipm_l2c = best_ipd[PB0];//获取CU的0号PU的帧内模式
         mod_info_curr->ipm[PB0][0] = (s8)best_ipd[PB0];
         COM_IPRED_CONV_L2C_CHK(ipm_l2c, chk_bypass);
 #if TSCPM
 #if ENHANCE_TSPCM
         /* add ehance_tscpm, 2 more mode */
 #if PMC
-        for (i = 0; i < IPD_CHROMA_CNT + 6; i++) /* UV */
+        for (i = 0; i < IPD_CHROMA_CNT + 6; i++) /* UV，check所有可能的色度预测模式，选出最好的一种 */
 #else
         for (i = 0; i < IPD_CHROMA_CNT + 3; i++) /* UV */
 #endif
