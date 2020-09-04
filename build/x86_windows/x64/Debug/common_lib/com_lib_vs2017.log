@@ -1,2 +1,14 @@
-﻿  com_util.c
+﻿  com_ComAdaptiveLoopFilter.c
+  com_df.c
+  com_esao.c
+  com_img.c
+  com_ipred.c
+  com_itdq.c
+  com_mc.c
+  com_picman.c
+  com_recon.c
+  com_sao.c
+  com_tbl.c
+  com_util.c
+  正在生成代码...
   com_lib_vs2017.vcxproj -> D:\Chaos_Folder\HPM-8.0\build\x86_windows\..\..\lib\common_lib.lib

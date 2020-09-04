@@ -2695,7 +2695,7 @@ static double mode_coding_unit(ENC_CTX *ctx, ENC_CORE *core, int x, int y, int c
     // copy table for dt and ipf, last, best, core
     COM_CNTMPM cntmpm_cands_curr;
     COM_CNTMPM cntmpm_cands_last;
-    if (ctx->info.sqh.fimc_enable_flag)
+    if (ctx->info.sqh.fimc_enable_flag)//缓存FIMC的历史信息
     {
         com_cntmpm_copy(&cntmpm_cands_last, &core->cntmpm_cands);
         com_cntmpm_copy(&cntmpm_cands_curr, &core->cntmpm_cands);
@@ -2729,7 +2729,7 @@ static double mode_coding_unit(ENC_CTX *ctx, ENC_CORE *core, int x, int y, int c
                 // copy table for dt and ipf
                 if (ctx->info.sqh.fimc_enable_flag && ipf_flag > 0)//默认会先执行不做ipf的情况，若开了ipf第二次执行时会进入if中
                 {
-                    com_cntmpm_copy(&core->cntmpm_cands, &cntmpm_cands_last);
+                    com_cntmpm_copy(&core->cntmpm_cands, &cntmpm_cands_last);//记录当前CU之前的频数表信息
                 }
 #endif
                 core->mod_info_curr.ipf_flag = ipf_flag;
@@ -4900,7 +4900,7 @@ static double mode_coding_tree(ENC_CTX *ctx, ENC_CORE *core, int x0, int y0, int
 #if MODE_CONS
                     num_cons_pred_mode_loop = (cons_pred_mode == NO_MODE_CONS && com_constrain_pred_mode(cu_width, cu_height, split_mode, ctx->slice_type)) ? 2 : 1;
 #endif
-                    for (int loop_idx = 0; loop_idx < num_cons_pred_mode_loop; loop_idx++)
+                    for (int loop_idx = 0; loop_idx < num_cons_pred_mode_loop; loop_idx++)//帧内或者帧间？
                     {
                         if (ctx->info.sqh.num_of_hmvp_cand && ctx->info.pic_header.slice_type != SLICE_I)
                         {

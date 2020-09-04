@@ -278,17 +278,17 @@ void ipred_plane(pel *src_le, pel *src_up, pel *dst, int w, int h)
     int  a, b, c, x, y;
     int  w2 = w >> 1;
     int  h2 = h >> 1;
-    int  ib_mult[5]  = { 13, 17, 5, 11, 23 };
-    int  ib_shift[5] = { 7, 10, 11, 15, 19 };
-    int  idx_w = com_tbl_log2[w] - 2;
-    int  idx_h = com_tbl_log2[h] - 2;
+    int  ib_mult[5]  = { 13, 17, 5, 11, 23 };// 4，8，16，32
+    int  ib_shift[5] = { 7, 10, 11, 15, 19 };// 4，8，16，32
+    int  idx_w = com_tbl_log2[w] - 2;// 宽/4
+    int  idx_h = com_tbl_log2[h] - 2;// 高/4
     int  im_h, is_h, im_v, is_v, temp, temp2;
     im_h = ib_mult[idx_w];
     is_h = ib_shift[idx_w];
     im_v = ib_mult[idx_h];
     is_v = ib_shift[idx_h];
-    rsrc = src_up + (w2 - 1);
-    for (x = 1; x < w2 + 1; x++)
+    rsrc = src_up + (w2 - 1);//指向 width 的中间
+    for (x = 1; x < w2 + 1; x++)//从1到w/2
     {
         coef_h += x * (rsrc[x] - rsrc[-x]);
     }
@@ -320,16 +320,16 @@ void ipred_bi(pel *src_le, pel *src_up, pel *dst, int w, int h)
     assert(com_tbl_log2[h] >= 2);
 
     int x, y;
-    int ishift_x = com_tbl_log2[w];
-    int ishift_y = com_tbl_log2[h];
-    int ishift = COM_MIN(ishift_x, ishift_y);
-    int ishift_xy = ishift_x + ishift_y + 1;
+    int ishift_x = com_tbl_log2[w];//宽的log2对数
+    int ishift_y = com_tbl_log2[h];//高的log2对数
+    int ishift = COM_MIN(ishift_x, ishift_y);//宽的log2对数  高的log2对数 的最小值
+    int ishift_xy = ishift_x + ishift_y + 1;//宽的log2对数 + 高的log2对数 + 1
     int offset = 1 << (ishift_x + ishift_y);
     int a, b, c, wt, wxy, tmp;
     int predx;
     int ref_up[MAX_CU_SIZE], ref_le[MAX_CU_SIZE], up[MAX_CU_SIZE], le[MAX_CU_SIZE], wy[MAX_CU_SIZE];
     int wc, tbl_wc[6] = {-1, 21, 13, 7, 4, 2};
-    wc = ishift_x > ishift_y ? ishift_x - ishift_y : ishift_y - ishift_x;
+    wc = ishift_x > ishift_y ? ishift_x - ishift_y : ishift_y - ishift_x;//宽和高 之比（大于1）
     com_assert(wc <= 5);
 
     wc = tbl_wc[wc];
@@ -501,9 +501,9 @@ void xSimpleGetTSCPMParameters(int compID, int *a, int *b, int *iShift, int bAbo
     int minDim = bLeftAvaillable && bAboveAvaillable ? min(uiCHeight, uiCWidth) : (bLeftAvaillable ? uiCHeight : uiCWidth);
     int numSteps = minDim;
     int yMax = 0;//Chroma
-    int xMax = -MAX_INT;//Luma
+    int xMax = -MAX_INT;//Luma，-
     int yMin = 0;//Chroma
-    int xMin = MAX_INT;//Luma
+    int xMin = MAX_INT;//Luma，+
 
     // four points start
     int iRefPointLuma[4] = { -1, -1, -1, -1 };
@@ -681,7 +681,7 @@ void xSimpleGetTSCPMParameters(int compID, int *a, int *b, int *iShift, int bAbo
         {
             shift = (uiInternalBitDepth > 8) ? uiInternalBitDepth - 6 : 2;
             add = shift ? 1 << (shift - 1) : 0;
-            diff = (diff + add) >> shift;//保留高4位
+            diff = (diff + add) >> shift;//保留高6位
 
             if (uiInternalBitDepth == 10)
             {
@@ -689,7 +689,7 @@ void xSimpleGetTSCPMParameters(int compID, int *a, int *b, int *iShift, int bAbo
             }
         }
 
-        if (diff > 0)//必满足
+        if (diff > 0)//必满足，同时也考虑了diff=0的情况
         {
             *a = ((yMax - yMin) * g_aiTscpmDivTable64[diff - 1] + add) >> shift;//当shift≠0时说明diff偏大（亮度差值大于64），由于此时对Δx右移了shift位，故此行代码将Δy也右移了shift位
         }
@@ -1072,8 +1072,8 @@ void ipred_ang(pel *src_le, pel *src_up, pel *dst, int w, int h, int ipm
     }
 }
 
-static const s32 g_ipf_pred_param[5][10] =
-{
+static const s32 g_ipf_pred_param[5][10] = //5种Size，最大预测距离10
+{/* 帧内预测滤波 的 滤波器系数 */
     { 24,  6,  2,  0,  0,  0,  0,  0,  0,  0 }, //4x4, 24, 0.5
     { 44, 25, 14,  8,  4,  2,  1,  1,  0,  0 }, //8x8, 44-1.2
     { 40, 27, 19, 13,  9,  6,  4,  3,  2,  1 }, //16x16, 40-1.8
@@ -1085,12 +1085,12 @@ void ipf_core(pel *src_le, pel *src_up, pel *dst, int ipm, int w, int h)
 {
     com_assert((MIN_CU_SIZE <= w) && (MIN_CU_SIZE <= h));
     com_assert(ipm < IPD_CNT);
-    assert(com_tbl_log2[w] >= 2);
+    assert(com_tbl_log2[w] >= 2);//大于4*4
     assert(com_tbl_log2[h] >= 2);
 
     s32 filter_idx_hor = (s32)com_tbl_log2[w] - 2; //Block Size
     s32 filter_idx_ver = (s32)com_tbl_log2[h] - 2; //Block Size
-    const s32 filter_range = 10;
+    const s32 filter_range = 10;//最大预测距离
     s32 ver_filter_range = filter_range;
     s32 hor_filter_range = filter_range;
 
@@ -1106,9 +1106,9 @@ void ipf_core(pel *src_le, pel *src_up, pel *dst, int ipm, int w, int h)
         ver_filter_range = 0; // don't use IPF at vertical direction
     }
 
-    const s32 *filter_hori_param = g_ipf_pred_param[filter_idx_hor];
+    const s32 *filter_hori_param = g_ipf_pred_param[filter_idx_hor];/* 指向所适用的滤波器 */
     const s32 *filter_vert_param = g_ipf_pred_param[filter_idx_ver];
-    const s32 par_shift = 6; //normalization factor
+    const s32 par_shift = 6; //normalization factor ：64
     const s32 par_scale = 1 << par_shift;
     const s32 par_offset = 1 << (par_shift - 1);
 
@@ -1134,7 +1134,7 @@ void ipf_core(pel *src_le, pel *src_up, pel *dst, int ipm, int w, int h)
     s32 p_ref_lenth = w + h;
     s32 *p_ref_vector = com_malloc(p_ref_lenth * sizeof(s32));
     com_mset(p_ref_vector, 0, (w + h) * sizeof(s32));
-    s32 *p_ref_vector_h = p_ref_vector + h;
+    s32 *p_ref_vector_h = p_ref_vector + h;//   Δ height
     for( s32 i = 0; i < w; ++i )
     {
         p_ref_vector_h[i] = src_up[i];
@@ -1143,7 +1143,8 @@ void ipf_core(pel *src_le, pel *src_up, pel *dst, int ipm, int w, int h)
     {
         p_ref_vector_h[-i] = src_le[i - 1];
     }
-
+    //                                        p_ref_vector_h↓
+    //            ... left[3] left[2]  left[1]  left[0]  up[0]  up[1] up[2] up[3] up[4] ...                    
     for (s32 row = 0; row < h; ++row)
     {
         s32 pos = row * w;
@@ -1151,8 +1152,9 @@ void ipf_core(pel *src_le, pel *src_up, pel *dst, int ipm, int w, int h)
         for (s32 col = 0; col < w; col++, pos++)
         {
             s32 coeff_left = (col < hor_filter_range) ? filter_hori_param[col] : 0;
-            s32 coeff_cur = par_scale - coeff_left - coeff_top;
+            s32 coeff_cur = par_scale - coeff_left - coeff_top;//if un-accessed, coeff_xx == 0 
             s32 sample_val = (coeff_left* p_ref_vector_h[-row - 1] + coeff_top * p_ref_vector_h[col] + coeff_cur * dst[pos] + par_offset) >> par_shift;
+            //[-row - 1]太绝了，往左偏置
             dst[pos] = sample_val;
         }
     }
@@ -1318,7 +1320,7 @@ void com_ipred_uv(pel *src_le, pel *src_up, pel *dst, int ipm_c, int ipm, int w,
     {
         switch(ipm_c)
         {
-        case IPD_HOR_C:
+        case IPD_HOR_C:/* 水平类模式，进行垂直方向的滤波 */
         case IPD_TSCPM_L_C:
             ipf_core(src_le, src_up, dst, IPD_HOR, w, h);
             clip_pred(dst, w, h, bit_depth);
