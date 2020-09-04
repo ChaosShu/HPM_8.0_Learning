@@ -1,2 +1,18 @@
-﻿  enc_pintra.c
+﻿  enc.c
+  enc_EncAdaptiveLoopFilter.c
+  enc_bsw.c
+  enc_eco.c
+  enc_esao.c
+  enc_mode.c
+  enc_pibc.c
+  enc_pinter.c
+  enc_pintra.c
+  enc_sad.c
+  enc_tbl.c
+  enc_tq.c
+  enc_util.c
+  正在生成代码...
+  enc_ibc_hashmap.cpp
+  enc_sp.cpp
+  正在生成代码...
   enc_lib_vs2017.vcxproj -> D:\Chaos_Folder\HPM-8.0\build\x86_windows\..\..\lib\encoder_lib.lib

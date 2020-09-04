@@ -6227,7 +6227,7 @@ s32  divide_tbl(s32 dividend, s32 divisor)
 #endif
 
 #if FIMC
-/* 更新FIMC频数表 */
+/* *更新FIMC频数表 */
 void com_cntmpm_update(COM_CNTMPM* cntMpm, const s8 currMode)
 {
     cntMpm->freqT[currMode] += CNTMPM_BASE_VAL;

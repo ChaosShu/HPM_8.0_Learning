@@ -1211,7 +1211,7 @@ double analyze_intra_cu(ENC_CTX *ctx, ENC_CORE *core)
                     return MAX_COST;
                 }
 #if EST
-                int st_all = (ctx->info.sqh.est_enable_flag && mod_info_curr->tb_part == 0) ? 2 : 1;//先看1
+                int st_all = (ctx->info.sqh.est_enable_flag && mod_info_curr->tb_part == 0) ? 2 : 1;//check允许/允许的 Enhanced secondary Transform
                 for (int use_st = 0; use_st < st_all; use_st++)
                 {
                     mod_info_curr->est_flag = use_st;
@@ -1332,7 +1332,7 @@ double analyze_intra_cu(ENC_CTX *ctx, ENC_CORE *core)
                 /*统计当前PU的IPM，并存入频数表*/
                 if (ctx->info.sqh.fimc_enable_flag) //  && pb_part_idx == PB0
                 {
-                    com_cntmpm_update(&core->cntmpm_cands, best_ipd_pb_part[pb_part_idx]);
+                    com_cntmpm_update(&core->cntmpm_cands, best_ipd_pb_part[pb_part_idx]);//记录当前CU下每个PU最好划分的频数表
                 }
 #endif
             }
@@ -1440,13 +1440,13 @@ double analyze_intra_cu(ENC_CTX *ctx, ENC_CORE *core)
                 // copy table for dt，记录更优DT划分的频数表
                 if (ctx->info.sqh.fimc_enable_flag && num_allowed_part_size > 1)
                 {
-                    com_cntmpm_copy(&cntmpm_cands_curr, &core->cntmpm_cands);
+                    com_cntmpm_copy(&cntmpm_cands_curr, &core->cntmpm_cands);//统计最好的CU划分方式（DT下）每个PU的模式，更新到当前CU的频数表
                 }
 #endif
             }
         }
 #if FIMC
-        // copy table for dt， 记录最优DT划分的频数表
+        // copy table for dt， 更新当前CU最优DT划分下的频数表
         if (ctx->info.sqh.fimc_enable_flag && num_allowed_part_size > 1)
         {
             com_cntmpm_copy(&core->cntmpm_cands, &cntmpm_cands_curr);
